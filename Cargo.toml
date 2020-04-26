@@ -1,6 +1,6 @@
 [package]
 name = "arsdk-rs"
-version = "0.0.1"
+version = "0.0.3"
 authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
 edition = "2018"
 description = "parrot arsdk in rust"
@@ -8,3 +8,7 @@ license = "MIT/Apache-2.0"
 keywords = ["drone", "parrot"]
 
 [dependencies]
+anyhow = "1.0"
+pnet = "0.25"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
