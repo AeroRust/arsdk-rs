@@ -66,6 +66,8 @@ impl Data for Class {
             }
             Class::Animations(animation) => {
                 buf.push(animation.clone().into());
+                // TODO: FIX THIS
+                buf.extend(vec![0, 0, 0, 0, 0]);
             }
             _ => {}
         }

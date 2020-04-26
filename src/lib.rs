@@ -1,21 +1,22 @@
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
+use dashmap::DashMap;
 use pnet::datalink;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, TcpStream, ToSocketAddrs, UdpSocket};
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::{channel, Sender};
-use std::time::Duration;
 
 const DEFAULT_ADDR: &str = "192.168.2.1";
 const INIT_PORT: u16 = 44444;
 const LISTEN_PORT: u16 = 43210;
 
 pub mod command;
+pub mod common;
 pub mod frame;
 pub mod jumping_sumo;
 
 pub struct Drone {
-    cmd_count: AtomicU8,
+    // Each frame::BufferID gets its own sequence_id
+    sequence_ids: DashMap<frame::BufferID, u8>,
     sender: Sender<Vec<u8>>,
 }
 
@@ -23,14 +24,13 @@ impl Drone {
     pub fn build_frame(
         &self,
         frame_type: frame::Type,
-        id: frame::ID,
+        buffer_id: frame::BufferID,
         feature: command::Feature,
     ) -> frame::Frame {
-        frame::Frame::new(frame_type, id, feature, self.cmd_id())
+        frame::Frame::new(frame_type, buffer_id, feature, self.sequence_id(buffer_id))
     }
 
     pub fn send_frame(&self, frame: frame::Frame) -> AnyResult<()> {
-        // .serialize(self.cmd_id())
         self.send_raw_frame_unchecked(frame)
     }
 
@@ -44,8 +44,15 @@ impl Drone {
 }
 
 impl Drone {
-    fn cmd_id(&self) -> u8 {
-        self.cmd_count.fetch_add(1, Ordering::SeqCst)
+    fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
+        if let Some(mut sequence_id) = self.sequence_ids.get_mut(&buffer_id) {
+            let command_id = *sequence_id;
+            *sequence_id += 1;
+            command_id
+        } else {
+            self.sequence_ids.insert(buffer_id, 1);
+            1
+        }
     }
 }
 
@@ -170,112 +177,8 @@ impl Drone {
         );
         let sender = spawn_cmd_sender(local_ip, addr, handshake_response.c2d_port)?;
         Ok(Self {
-            cmd_count: AtomicU8::new(1),
+            sequence_ids: DashMap::new(),
             sender,
         })
-    }
-
-    // pub fn spin_right(&self) -> AnyResult<()> {
-    //     let mut ps = PilotState {
-    //         flag: 1,
-    //         speed: 0,
-    //         turn: 127,
-    //     };
-    //     self.sender
-    //         .send(DroneCommand::drive(ps).serialize(self.cmd_id()));
-    //     Ok(())
-    // }
-
-    // pub fn spin_left(&self) -> AnyResult<()> {
-    //     let mut ps = PilotState {
-    //         flag: 1,
-    //         speed: 0,
-    //         turn: -128,
-    //     };
-    //     self.sender
-    //         .send(DroneCommand::drive(ps).serialize(self.cmd_id()));
-    //     Ok(())
-    // }
-
-    // pub fn stop(&self) -> AnyResult<()> {
-    //     let mut ps = PilotState {
-    //         flag: 0,
-    //         speed: 0,
-    //         turn: 0,
-    //     };
-    //     self.sender
-    //         .send(DroneCommand::drive(ps).serialize(self.cmd_id()));
-    //     Ok(())
-    // }
-}
-
-struct Params(Vec<Param>);
-
-impl IntoIterator for Params {
-    type Item = String;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0
-            .iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<_>>()
-            .into_iter()
-    }
-}
-
-impl Into<Vec<String>> for Params {
-    fn into(self) -> Vec<String> {
-        self.0.into_iter().map(|i| i.0).collect()
-    }
-}
-
-impl From<Vec<i32>> for Params {
-    fn from(v: Vec<i32>) -> Self {
-        Self(v.into_iter().map(|e| e.into()).collect())
-    }
-}
-
-impl From<Vec<f32>> for Params {
-    fn from(v: Vec<f32>) -> Self {
-        Self(v.into_iter().map(|e| e.into()).collect())
-    }
-}
-impl From<Vec<&str>> for Params {
-    fn from(v: Vec<&str>) -> Self {
-        Self(v.into_iter().map(|e| e.into()).collect())
-    }
-}
-
-#[derive(Clone)]
-struct Param(String);
-
-impl std::string::ToString for Param {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
-impl From<i32> for Param {
-    fn from(i: i32) -> Self {
-        Self(i.to_string())
-    }
-}
-
-impl From<f32> for Param {
-    fn from(f: f32) -> Self {
-        Self(f.to_bits().to_string())
-    }
-}
-
-impl From<&str> for Param {
-    fn from(s: &str) -> Self {
-        Self(format!("\"{}\"", s))
-    }
-}
-
-impl From<Duration> for Param {
-    fn from(d: Duration) -> Self {
-        Self(format!("{}", d.as_secs().to_string()))
     }
 }

@@ -1,9 +1,10 @@
+use crate::common;
 use crate::frame::Data;
 use crate::jumping_sumo;
 #[derive(Debug, PartialEq, Clone, Copy)]
 
 pub enum Feature {
-    Common,                           // ARCOMMANDS_ID_FEATURE_COMMON = 0,
+    Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     Ardrone3,                         // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
     Minidrone,                        // ARCOMMANDS_ID_FEATURE_MINIDRONE = 2,
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
@@ -28,7 +29,7 @@ pub enum Feature {
 impl Into<u8> for Feature {
     fn into(self) -> u8 {
         match self {
-            Self::Common => 0,
+            Self::Common(_) => 0,
             Self::Ardrone3 => 1,
             Self::Minidrone => 2,
             Self::JumpingSumo(_) => 3,
@@ -58,6 +59,9 @@ impl Data for Feature {
             Feature::JumpingSumo(js) => {
                 buf.extend(js.serialize());
             }
+            Feature::Common(common) => {
+                buf.extend(common.serialize());
+            }
             _ => {}
         }
         buf
@@ -71,7 +75,10 @@ mod command_tests {
     use super::*;
     #[test]
     fn test_feature() {
-        assert_feature(Feature::Common, 0);
+        assert_feature(
+            Feature::Common(common::Class::Common(common::Common::AllStates)),
+            0,
+        );
         assert_feature(Feature::Ardrone3, 1);
         assert_feature(Feature::Minidrone, 2);
         assert_feature(
