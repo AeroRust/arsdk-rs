@@ -35,11 +35,11 @@ pub enum Class {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Anim {
-    JumpStop,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPSTOP = 0,
-    JumpCancel,      // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPCANCEL = 1,
-    JumpLoad,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPLOAD = 2,
-    Jump,            // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMP = 3,
-    SimpleAnimation, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
+    JumpStop = 0,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPSTOP = 0,
+    JumpCancel = 1,      // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPCANCEL = 1,
+    JumpLoad = 2,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPLOAD = 2,
+    Jump = 3,            // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMP = 3,
+    SimpleAnimation = 4, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -51,7 +51,7 @@ pub enum PilotingID {
 
 #[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct PilotState {
-    pub flag: u8,
+    pub flag: bool,
     pub speed: i8,
     pub turn: i8,
 }

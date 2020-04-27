@@ -1,4 +1,4 @@
-use crate::command;
+use crate::{command, Drone};
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use std::convert::TryFrom;
 
@@ -23,8 +23,8 @@ impl Frame {
     pub fn new(
         frame_type: Type,
         buffer_id: BufferID,
-        feature: command::Feature,
         sequence_id: u8,
+        feature: command::Feature,
     ) -> Self {
         Self {
             frame_type,
@@ -32,6 +32,15 @@ impl Frame {
             sequence_id,
             feature,
         }
+    }
+
+    pub fn for_drone(
+        drone: &Drone,
+        frame_type: Type,
+        buffer_id: BufferID,
+        feature: command::Feature,
+    ) -> Frame {
+        Frame::new(frame_type, buffer_id, drone.sequence_id(buffer_id), feature)
     }
 }
 
@@ -71,9 +80,9 @@ pub enum BufferID {
     CDAck = 11,       //#define BD_NET_CD_ACK_ID 11
     CDEmergency = 12, // #define BD_NET_CD_EMERGENCY_ID 12
     CDVideoAck = 13,  // #define BD_NET_CD_VIDEO_ACK_ID 13
-    DCVideo = 125,     // #define BD_NET_DC_VIDEO_DATA_ID 125
-    DCEvent = 126,     // #define BD_NET_DC_EVENT_ID 126
-    DCNavdata = 127,   // #define BD_NET_DC_NAVDATA_ID 127
+    DCVideo = 125,    // #define BD_NET_DC_VIDEO_DATA_ID 125
+    DCEvent = 126,    // #define BD_NET_DC_EVENT_ID 126
+    DCNavdata = 127,  // #define BD_NET_DC_NAVDATA_ID 127
 }
 
 // --------------------- Conversion impls --------------------- //
@@ -142,7 +151,7 @@ mod frame_tests {
     use super::*;
     use crate::common::{self, Class as CommonClass};
     use crate::jumping_sumo::*;
-    use chrono::{Utc, TimeZone};
+    use chrono::{TimeZone, Utc};
 
     use std::convert::TryInto;
 
@@ -187,7 +196,7 @@ mod frame_tests {
         let expected_message = "0x2 0xa 0x67 0xe 0x0 0x0 0x0 0x3 0x0 0x0 0x0 0x1 0x0 0x9c";
 
         let pilot_state = PilotState {
-            flag: 1,
+            flag: true,
             speed: 0,
             turn: -100,
         };
