@@ -32,7 +32,7 @@ impl Drone {
         self.sender.send(raw_frame).map_err(AnyError::new)
     }
 
-    pub fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
+    pub(crate) fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
         if let Some(mut sequence_id) = self.sequence_ids.get_mut(&buffer_id) {
             let command_id = *sequence_id;
             *sequence_id += 1;
