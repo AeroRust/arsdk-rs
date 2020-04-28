@@ -1,0 +1,13 @@
+[package]
+name = "jumpingsumo-rs"
+version = "0.0.1"
+authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
+edition = "2018"
+description = "parrot jumping sumo in rust"
+license = "MIT/Apache-2.0"
+keywords = ["drone", "parrot", "jumping", "sumo"]
+
+[dependencies]
+anyhow = "1.0"
+arsdk-rs = "0.0" # { path = "../arsdk-rs" } 
+chrono = "0.4"
