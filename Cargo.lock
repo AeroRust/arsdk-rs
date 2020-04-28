@@ -37,20 +37,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arsdk-rs"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d65e0ceffd8a9bd5815c25951aa7979d041417e8ad046f65669f4a76615d0af3"
-dependencies = [
- "anyhow",
- "chrono",
- "dashmap",
- "pnet",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -156,7 +142,7 @@ name = "jumpingsumo-rs"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "arsdk-rs 0.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "arsdk-rs",
  "chrono",
 ]
 

@@ -9,5 +9,5 @@ keywords = ["drone", "parrot", "jumping", "sumo"]
 
 [dependencies]
 anyhow = "1.0"
-arsdk-rs = "0.0" # { path = "../arsdk-rs" } 
+arsdk-rs = { path = "../arsdk-rs" }
 chrono = "0.4"
