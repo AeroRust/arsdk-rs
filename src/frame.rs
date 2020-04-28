@@ -1,4 +1,4 @@
-use crate::command;
+use crate::{command, Drone};
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use std::convert::TryFrom;
 
@@ -11,6 +11,7 @@ pub trait Data {
     fn serialize(&self) -> Vec<u8>;
 }
 
+#[derive(Debug, Clone)]
 pub struct Frame {
     frame_type: Type,
     buffer_id: BufferID,
@@ -22,8 +23,8 @@ impl Frame {
     pub fn new(
         frame_type: Type,
         buffer_id: BufferID,
-        feature: command::Feature,
         sequence_id: u8,
+        feature: command::Feature,
     ) -> Self {
         Self {
             frame_type,
@@ -32,25 +33,30 @@ impl Frame {
             feature,
         }
     }
+
+    pub fn for_drone(
+        drone: &Drone,
+        frame_type: Type,
+        buffer_id: BufferID,
+        feature: command::Feature,
+    ) -> Frame {
+        Frame::new(frame_type, buffer_id, drone.sequence_id(buffer_id), feature)
+    }
 }
 
 impl IntoRawFrame for Frame {
     fn into_raw(self) -> RawFrame {
-        // Frame size without data
-        let mut buf = Vec::with_capacity(10);
+        let ser_feature = self.feature.serialize();
+        // Frame size 3 bytes + 4 bytes (u32) + ser_feature.len()
+        let buf_len = 7 + ser_feature.len();
+
+        let mut buf = Vec::with_capacity(buf_len);
         buf.push(self.frame_type.into());
         buf.push(self.buffer_id.into());
         buf.push(self.sequence_id);
-        // frame size as u32
-        buf.extend(&[0; 4]);
-        buf.extend(self.feature.serialize());
-
-        // frame size as u32
-        let buf_size = buf.len() as u32;
-        buf[3] = (buf_size) as u8;
-        buf[4] = (buf_size >> 8) as u8;
-        buf[5] = (buf_size >> 16) as u8;
-        buf[6] = (buf_size >> 24) as u8;
+        // buffer size as u32 (4 bytes)
+        buf.extend(&(buf_len as u32).to_le_bytes());
+        buf.extend(ser_feature);
 
         RawFrame(buf)
     }
@@ -60,23 +66,23 @@ impl IntoRawFrame for Frame {
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Type {
-    Uninitialized, // ARNETWORKAL_FRAME_TYPE_UNINITIALIZED 0
-    Ack,           // ARNETWORKAL_FRAME_TYPE_ACK 1
-    Data,          // ARNETWORKAL_FRAME_TYPE_DATA 2
-    LowLatency,    // ARNETWORKAL_FRAME_TYPE_DATA_LOW_LATENCY 3
-    DataWithAck,   // ARNETWORKAL_FRAME_TYPE_DATA_WITH_ACK 4
-    Max,           // ARNETWORKAL_FRAME_TYPE_MAX 5
+    Uninitialized = 0, // ARNETWORKAL_FRAME_TYPE_UNINITIALIZED 0
+    Ack = 1,           // ARNETWORKAL_FRAME_TYPE_ACK 1
+    Data = 2,          // ARNETWORKAL_FRAME_TYPE_DATA 2
+    LowLatency = 3,    // ARNETWORKAL_FRAME_TYPE_DATA_LOW_LATENCY 3
+    DataWithAck = 4,   // ARNETWORKAL_FRAME_TYPE_DATA_WITH_ACK 4
+    Max = 5,           // ARNETWORKAL_FRAME_TYPE_MAX 5
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum BufferID {
-    CDNonAck,    //#define BD_NET_CD_NONACK_ID 10
-    CDAck,       //#define BD_NET_CD_ACK_ID 11
-    CDEmergency, // #define BD_NET_CD_EMERGENCY_ID 12
-    CDVideoAck,  // #define BD_NET_CD_VIDEO_ACK_ID 13
-    DCVideo,     // #define BD_NET_DC_VIDEO_DATA_ID 125
-    DCEvent,     // #define BD_NET_DC_EVENT_ID 126
-    DCNavdata,   // #define BD_NET_DC_NAVDATA_ID 127
+    CDNonAck = 10,    //#define BD_NET_CD_NONACK_ID 10
+    CDAck = 11,       //#define BD_NET_CD_ACK_ID 11
+    CDEmergency = 12, // #define BD_NET_CD_EMERGENCY_ID 12
+    CDVideoAck = 13,  // #define BD_NET_CD_VIDEO_ACK_ID 13
+    DCVideo = 125,    // #define BD_NET_DC_VIDEO_DATA_ID 125
+    DCEvent = 126,    // #define BD_NET_DC_EVENT_ID 126
+    DCNavdata = 127,  // #define BD_NET_DC_NAVDATA_ID 127
 }
 
 // --------------------- Conversion impls --------------------- //
@@ -145,7 +151,7 @@ mod frame_tests {
     use super::*;
     use crate::common::{self, Class as CommonClass};
     use crate::jumping_sumo::*;
-    use chrono::{offset::Utc, TimeZone};
+    use chrono::{TimeZone, Utc};
 
     use std::convert::TryInto;
 
@@ -187,10 +193,10 @@ mod frame_tests {
 
     #[test]
     fn test_jumpingsumo_move_command() {
-        let expected_message = "0x2 0xa 0x67 0x0 0x0 0x0 0xe 0x3 0x0 0x0 0x0 0x1 0x0 0x9c";
+        let expected_message = "0x2 0xa 0x67 0xe 0x0 0x0 0x0 0x3 0x0 0x0 0x0 0x1 0x0 0x9c";
 
         let pilot_state = PilotState {
-            flag: 1,
+            flag: true,
             speed: 0,
             turn: -100,
         };
@@ -207,7 +213,7 @@ mod frame_tests {
 
     #[test]
     fn test_jumpingsumo_jump_command() {
-        let expected_message = "0x2 0xb 0x1 0xf 0x0 0x0 0x0 0x3 0x2 0x3 0x0 0x0 0x0 0x0 0x0";
+        let expected_message = "0x4 0xb 0x1 0xf 0x0 0x0 0x0 0x3 0x2 0x3 0x0 0x0 0x0 0x0 0x0";
 
         let frame = Frame {
             frame_type: Type::DataWithAck,

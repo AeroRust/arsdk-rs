@@ -2,10 +2,9 @@ use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use dashmap::DashMap;
 use pnet::datalink;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, TcpStream, ToSocketAddrs, UdpSocket};
+use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc::{channel, Sender};
 
-const DEFAULT_ADDR: &str = "192.168.2.1";
 const INIT_PORT: u16 = 44444;
 const LISTEN_PORT: u16 = 43210;
 
@@ -21,15 +20,6 @@ pub struct Drone {
 }
 
 impl Drone {
-    pub fn build_frame(
-        &self,
-        frame_type: frame::Type,
-        buffer_id: frame::BufferID,
-        feature: command::Feature,
-    ) -> frame::Frame {
-        frame::Frame::new(frame_type, buffer_id, feature, self.sequence_id(buffer_id))
-    }
-
     pub fn send_frame(&self, frame: frame::Frame) -> AnyResult<()> {
         self.send_raw_frame_unchecked(frame)
     }
@@ -41,10 +31,8 @@ impl Drone {
     fn send(&self, raw_frame: Vec<u8>) -> AnyResult<()> {
         self.sender.send(raw_frame).map_err(AnyError::new)
     }
-}
 
-impl Drone {
-    fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
+    pub(crate) fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
         if let Some(mut sequence_id) = self.sequence_ids.get_mut(&buffer_id) {
             let command_id = *sequence_id;
             *sequence_id += 1;
@@ -83,11 +71,11 @@ struct HandshakeResponse {
     status: i8,
 }
 
-fn perform_handshake(target: impl ToSocketAddrs) -> AnyResult<HandshakeResponse> {
+fn perform_handshake(target: impl ToSocketAddrs, d2c_port: u16) -> AnyResult<HandshakeResponse> {
     let handshake_message = HandshakeMessage {
         controller_name: "Drone-rs".to_string(),
         controller_type: "computer".to_string(),
-        d2c_port: LISTEN_PORT,
+        d2c_port,
     };
 
     println!(
@@ -117,7 +105,7 @@ fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
             println!("Read {} bytes from {}", bytes_read, origin.ip());
             println!(
                 "{}",
-                String::from_utf8(buf.to_vec()).unwrap_or("unknown".to_string())
+                String::from_utf8(buf.to_vec()).unwrap_or_else(|_| "unknown".to_string())
             );
         }
     });
@@ -131,27 +119,19 @@ fn print_message(buf: &[u8]) {
     println!();
 }
 
-fn spawn_cmd_sender<'f>(
-    local_ip: IpAddr,
-    target_ip: IpAddr,
-    port: u16,
-) -> AnyResult<Sender<Vec<u8>>> {
-    let socket = UdpSocket::bind((local_ip, port)).map_err(|e| {
-        anyhow!(
-            "Couldn't bind to local socket {}:{} - {}",
-            local_ip,
-            port,
-            e
-        )
-    })?;
+fn spawn_cmd_sender(local_ip: IpAddr, target_addr: SocketAddr) -> AnyResult<Sender<Vec<u8>>> {
+    let local_addr = SocketAddr::new(local_ip, target_addr.port());
+
+    let socket = UdpSocket::bind(local_addr)
+        .map_err(|e| anyhow!("Couldn't bind to local socket {} - {}", local_addr, e))?;
 
     let (tx, rx) = channel::<Vec<u8>>();
     std::thread::spawn(move || loop {
-        let mut frame_to_send = rx.recv().expect("couldn't receive frame.");
+        let frame_to_send = rx.recv().expect("couldn't receive frame.");
 
         print_message(&frame_to_send);
         let size = socket
-            .send_to(&mut frame_to_send, (target_ip, port))
+            .send_to(&frame_to_send, target_addr)
             .expect("something terrible happened");
         println!("sent {}", size);
     });
@@ -159,23 +139,19 @@ fn spawn_cmd_sender<'f>(
 }
 
 impl Drone {
-    pub fn new(addr: Option<IpAddr>) -> AnyResult<Self> {
-        let addr = addr.unwrap_or(
-            DEFAULT_ADDR
-                .parse()
-                .expect("couldn't parse default ip address"),
-        );
-
+    pub fn new(addr: IpAddr) -> AnyResult<Self> {
         let local_ip = local_ip(addr)
             .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", addr))?;
 
-        spawn_listener((local_ip, LISTEN_PORT))?;
-        let handshake_response = perform_handshake((addr, INIT_PORT))?;
-        println!(
-            "spawning cmd sender on {}:{}",
-            addr, &handshake_response.c2d_port
-        );
-        let sender = spawn_cmd_sender(local_ip, addr, handshake_response.c2d_port)?;
+        let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
+        spawn_listener(local_listener)?;
+
+        let handshake_response = perform_handshake((addr, INIT_PORT), local_listener.port())?;
+
+        let cmd_sender_addr = SocketAddr::new(addr, handshake_response.c2d_port);
+
+        println!("spawning cmd sender on {}", cmd_sender_addr);
+        let sender = spawn_cmd_sender(local_ip, cmd_sender_addr)?;
         Ok(Self {
             sequence_ids: DashMap::new(),
             sender,
