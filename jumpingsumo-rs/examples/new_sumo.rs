@@ -8,10 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let js = JumpingSumo::new(drone_address)?;
 
-    std::thread::sleep(std::time::Duration::from_secs(2));
-
-    js.jump()?;
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    js.forward()?;
 
     Ok(())
 }

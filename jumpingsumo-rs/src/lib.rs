@@ -1,7 +1,7 @@
 use anyhow::Result as AnyResult;
 use arsdk_rs::command::Feature::{Common as CommonFeature, JumpingSumo as JumpingSumoFeature};
 use arsdk_rs::common;
-use arsdk_rs::frame::{BufferID, Type as FrameType};
+use arsdk_rs::frame::{Frame, BufferID, Type as FrameType};
 use arsdk_rs::jumping_sumo::Anim;
 use arsdk_rs::jumping_sumo::Class::*;
 use arsdk_rs::jumping_sumo::PilotingID::*;
@@ -19,7 +19,7 @@ const TURN_ANGLE: i8 = 30;
 const FORWARD_SPEED: i8 = 100;
 
 impl JumpingSumo {
-    pub fn new(addr: Option<IpAddr>) -> AnyResult<Self> {
+    pub fn new(addr: IpAddr) -> AnyResult<Self> {
         let js = Self {
             drone: Drone::new(addr)?,
         };
@@ -36,7 +36,7 @@ impl JumpingSumo {
 
     pub fn forward(&self) -> AnyResult<()> {
         self.drive(PilotState {
-            flag: 1,
+            flag: true,
             speed: FORWARD_SPEED,
             turn: 0,
         })
@@ -44,7 +44,7 @@ impl JumpingSumo {
 
     pub fn backwards(&self) -> AnyResult<()> {
         self.drive(PilotState {
-            flag: 1,
+            flag: true,
             speed: -FORWARD_SPEED,
             turn: 0,
         })
@@ -52,7 +52,7 @@ impl JumpingSumo {
 
     pub fn turn_left(&self) -> AnyResult<()> {
         self.drive(PilotState {
-            flag: 1,
+            flag: true,
             speed: 0,
             turn: -TURN_ANGLE,
         })
@@ -60,7 +60,7 @@ impl JumpingSumo {
 
     pub fn turn_right(&self) -> AnyResult<()> {
         self.drive(PilotState {
-            flag: 1,
+            flag: true,
             speed: 0,
             turn: TURN_ANGLE,
         })
@@ -68,7 +68,7 @@ impl JumpingSumo {
 
     pub fn stop(&self) -> AnyResult<()> {
         self.drive(PilotState {
-            flag: 0,
+            flag: false,
             speed: 0,
             turn: 0,
         })
@@ -76,36 +76,30 @@ impl JumpingSumo {
 
     pub fn drive(&self, state: PilotState) -> AnyResult<()> {
         let feature = JumpingSumoFeature(Piloting(Pilot(state)));
-        let command = self
-            .drone
-            .build_frame(FrameType::Data, BufferID::CDNonAck, feature);
-        self.drone.send_frame(command)
+        let frame = Frame::for_drone(&self.drone, FrameType::Data, BufferID::CDNonAck, feature);
+
+        self.drone.send_frame(frame)
     }
 
     pub fn jump(&self) -> AnyResult<()> {
         let feature = JumpingSumoFeature(Animations(Anim::Jump));
-        let command = self
-            .drone
-            .build_frame(FrameType::DataWithAck, BufferID::CDAck, feature);
+        let frame = Frame::for_drone(&self.drone, FrameType::DataWithAck, BufferID::CDAck, feature);
 
-        self.drone.send_frame(command)
+        self.drone.send_frame(frame)
     }
 
     fn send_date(&self, date: DateTime<Utc>) -> AnyResult<()> {
         let feature = CommonFeature(common::Class::Common(common::Common::CurrentDate(date)));
-        let command = self
-            .drone
-            .build_frame(FrameType::DataWithAck, BufferID::CDAck, feature);
 
-        self.drone.send_frame(command)
+        let frame = Frame::for_drone(&self.drone, FrameType::DataWithAck, BufferID::CDAck, feature);
+
+        self.drone.send_frame(frame)
     }
 
     fn send_time(&self, date: DateTime<Utc>) -> AnyResult<()> {
         let feature = CommonFeature(common::Class::Common(common::Common::CurrentTime(date)));
-        let command = self
-            .drone
-            .build_frame(FrameType::DataWithAck, BufferID::CDAck, feature);
+        let frame = Frame::for_drone(&self.drone, FrameType::DataWithAck, BufferID::CDAck, feature);
 
-        self.drone.send_frame(command)
+        self.drone.send_frame(frame)
     }
 }
