@@ -9,4 +9,3 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0"
 arsdk-rs = { path = "../arsdk-rs" }
-chrono = "0.4"

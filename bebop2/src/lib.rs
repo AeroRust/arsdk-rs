@@ -3,20 +3,21 @@ use arsdk_rs::{
     command::Feature,
     frame::{BufferID, Frame, Type},
 };
-use chrono::Utc;
-use std::net::IpAddr;
 
-pub use arsdk_rs::{ardrone3::ArDrone3, Drone, PARROT_SPHINX_IP};
+pub use arsdk_rs::{ardrone3::ArDrone3, prelude::*};
+
+pub mod prelude {
+    pub use crate::Bebop2;
+    pub use arsdk_rs::{ardrone3::ArDrone3, prelude::*};
+}
 
 pub struct Bebop2 {
     drone: Drone,
 }
 
 impl Bebop2 {
-    pub fn connect(addr: IpAddr) -> AnyResult<Self> {
-        let drone = Drone::new(addr)?;
-
-        drone.send_date_time(Utc::now())?;
+    pub fn connect(config: Config) -> AnyResult<Self> {
+        let drone = Drone::connect(config)?;
 
         Ok(Self { drone })
     }

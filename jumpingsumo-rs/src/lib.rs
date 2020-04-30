@@ -1,15 +1,16 @@
 use anyhow::Result as AnyResult;
-use arsdk_rs::command::Feature::{Common as CommonFeature, JumpingSumo as JumpingSumoFeature};
-use arsdk_rs::common;
-use arsdk_rs::frame::{BufferID, Frame, Type as FrameType};
-use arsdk_rs::jumping_sumo::Anim;
-use arsdk_rs::jumping_sumo::Class::*;
-use arsdk_rs::jumping_sumo::PilotingID::*;
-use arsdk_rs::Drone;
-use chrono::{offset::Utc, DateTime};
-use std::net::IpAddr;
+use arsdk_rs::{
+    command::Feature::JumpingSumo as JumpingSumoFeature,
+    frame::{BufferID, Frame, Type as FrameType},
+    jumping_sumo::{Anim, Class::*, PilotingID::*},
+    Drone,
+    jumping_sumo::PilotState, Config
+};
 
-pub use arsdk_rs::jumping_sumo::PilotState;
+pub mod prelude {
+    pub use crate::JumpingSumo;
+    pub use arsdk_rs::{jumping_sumo::PilotState, prelude::*};
+}
 
 pub struct JumpingSumo {
     drone: Drone,
@@ -19,19 +20,10 @@ const TURN_ANGLE: i8 = 30;
 const FORWARD_SPEED: i8 = 100;
 
 impl JumpingSumo {
-    pub fn new(addr: IpAddr) -> AnyResult<Self> {
-        let js = Self {
-            drone: Drone::new(addr)?,
-        };
-
-        // Note that you should generate both strings from a single timestamp
-        // to avoid any loop error at midnight
-        let now = chrono::offset::Utc::now();
-
-        js.send_date(now)?;
-        js.send_time(now)?;
-
-        Ok(js)
+    pub fn connect(config: Config) -> AnyResult<Self> {
+        Ok(Self {
+            drone: Drone::connect(config)?,
+        })
     }
 
     pub fn forward(&self) -> AnyResult<()> {
@@ -83,31 +75,6 @@ impl JumpingSumo {
 
     pub fn jump(&self) -> AnyResult<()> {
         let feature = JumpingSumoFeature(Animations(Anim::Jump));
-        let frame = Frame::for_drone(
-            &self.drone,
-            FrameType::DataWithAck,
-            BufferID::CDAck,
-            feature,
-        );
-
-        self.drone.send_frame(frame)
-    }
-
-    fn send_date(&self, date: DateTime<Utc>) -> AnyResult<()> {
-        let feature = CommonFeature(common::Class::Common(common::Common::CurrentDate(date)));
-
-        let frame = Frame::for_drone(
-            &self.drone,
-            FrameType::DataWithAck,
-            BufferID::CDAck,
-            feature,
-        );
-
-        self.drone.send_frame(frame)
-    }
-
-    fn send_time(&self, date: DateTime<Utc>) -> AnyResult<()> {
-        let feature = CommonFeature(common::Class::Common(common::Common::CurrentTime(date)));
         let frame = Frame::for_drone(
             &self.drone,
             FrameType::DataWithAck,

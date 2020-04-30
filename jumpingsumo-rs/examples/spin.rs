@@ -1,10 +1,9 @@
-use jumpingsumo_rs::{JumpingSumo, PilotState};
 use std::error::Error;
-use std::net::IpAddr;
-fn main() -> Result<(), Box<dyn Error>> {
-    let drone_address = "192.168.2.1".parse::<IpAddr>()?;
 
-    let js = JumpingSumo::new(drone_address)?;
+use jumpingsumo_rs::prelude::*;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let js = JumpingSumo::connect(PARROT_SPHINX_CONFIG)?;
 
     loop {
         std::thread::sleep(std::time::Duration::from_secs(2));

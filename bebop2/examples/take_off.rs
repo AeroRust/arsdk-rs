@@ -1,11 +1,9 @@
 use std::error::Error;
 
-use bebop2::{Bebop2, PARROT_SPHINX_IP};
+use bebop2::prelude::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let drone_address = PARROT_SPHINX_IP;
-
-    let drone = Bebop2::connect(drone_address)?;
+    let drone = Bebop2::connect(PARROT_SPHINX_CONFIG)?;
 
     drone.take_off()?;
 

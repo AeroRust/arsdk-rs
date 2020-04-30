@@ -48,7 +48,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arsdk-rs",
- "chrono",
 ]
 
 [[package]]

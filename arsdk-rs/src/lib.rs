@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
-use chrono::{offset::Utc, DateTime};
+use chrono::{Utc, DateTime};
 use dashmap::DashMap;
 use pnet::datalink;
 use serde::{Deserialize, Serialize};
@@ -9,12 +9,28 @@ use std::sync::mpsc::{channel, Sender};
 pub const INIT_PORT: u16 = 44444;
 pub const LISTEN_PORT: u16 = 43210;
 pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
+pub const PARROT_SPHINX_CONFIG: Config = Config { drone_addr: PARROT_SPHINX_IP, send_datetime: true };
 
 pub mod ardrone3;
 pub mod command;
 pub mod common;
 pub mod frame;
 pub mod jumping_sumo;
+
+pub mod prelude {
+    pub use crate::{PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP, Config, Drone};
+}
+
+#[derive(Debug)]
+pub struct Config {
+    pub drone_addr: IpAddr,
+    /// Wheather or not it should send:
+    ///
+    /// ```rust
+    /// let now: DateTime<Utc> = Utc::now()
+    /// ```
+    pub send_datetime: bool,
+}
 
 pub struct Drone {
     // Each frame::BufferID gets its own sequence_id
@@ -23,29 +39,36 @@ pub struct Drone {
 }
 
 impl Drone {
-    /// Connects to drone
-
-    /// Spawns Listener at LISTENER_PORT
-    /// Perfroms Handshake at INIT_PORT
-    /// Spawns Command sender at `c2d_port`
-    pub fn new(addr: IpAddr) -> AnyResult<Self> {
-        let local_ip = local_ip(addr)
-            .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", addr))?;
+    /// Connects to a drone
+    ///
+    /// * Spawns Listener at LISTENER_PORT
+    /// * Perfroms Handshake at INIT_PORT
+    /// * Spawns Command sender at `c2d_port`
+    pub fn connect(config: Config) -> AnyResult<Self> {
+        let local_ip = local_ip(config.drone_addr)
+            .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", config.drone_addr))?;
 
         let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
         spawn_listener(local_listener)?;
 
-        let init_addr = SocketAddr::new(addr, INIT_PORT);
+        let init_addr = SocketAddr::new(config.drone_addr, INIT_PORT);
         let handshake_response = perform_handshake(init_addr, local_listener.port())?;
 
-        let cmd_sender_addr = SocketAddr::new(addr, handshake_response.c2d_port);
+        let cmd_sender_target = SocketAddr::new(config.drone_addr, handshake_response.c2d_port);
 
-        println!("spawning cmd sender on {}", cmd_sender_addr);
-        let sender = spawn_cmd_sender(local_ip, cmd_sender_addr)?;
-        Ok(Self {
+        println!("spawning cmd sender on {}", cmd_sender_target);
+        let sender = spawn_cmd_sender(local_ip, cmd_sender_target)?;
+
+        let drone = Self {
             sequence_ids: DashMap::new(),
             sender,
-        })
+        };
+
+        if config.send_datetime {
+            drone.send_datetime(Utc::now())?;
+        }
+
+        Ok(drone)
     }
 
     pub fn send_frame(&self, frame: frame::Frame) -> AnyResult<()> {
@@ -60,7 +83,7 @@ impl Drone {
         self.sender.send(raw_frame).map_err(AnyError::new)
     }
 
-    pub fn send_date_time(&self, date: DateTime<Utc>) -> AnyResult<()> {
+    pub fn send_datetime(&self, date: DateTime<Utc>) -> AnyResult<()> {
         use command::Feature::Common;
         use common::Class;
         use frame::{BufferID, Frame, Type};
@@ -122,7 +145,7 @@ struct HandshakeResponse {
 
 fn perform_handshake(target: SocketAddr, d2c_port: u16) -> AnyResult<HandshakeResponse> {
     let handshake_message = HandshakeMessage {
-        controller_name: "Drone-rs".to_string(),
+        controller_name: "arsdk-rs".to_string(),
         controller_type: "computer".to_string(),
         d2c_port,
         // arstream2_client_stream_port: Some(44445),
