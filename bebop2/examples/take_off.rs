@@ -7,5 +7,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     drone.take_off()?;
 
+    std::thread::sleep(std::time::Duration::from_secs(20));
+
     Ok(())
 }

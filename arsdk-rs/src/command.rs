@@ -83,7 +83,7 @@ mod command_tests {
             Feature::Common(common::Class::Common(common::Common::AllStates)),
             0,
         );
-        assert_feature(Feature::ArDrone3, 1);
+        assert_feature(Feature::ArDrone3(ArDrone3::TakeOff), 1);
         assert_feature(Feature::Minidrone, 2);
         assert_feature(
             Feature::JumpingSumo(jumping_sumo::Class::Piloting(

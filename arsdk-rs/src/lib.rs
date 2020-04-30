@@ -10,7 +10,8 @@ pub const LISTEN_PORT: u16 = 43210;
 pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
 pub const PARROT_SPHINX_CONFIG: Config = Config {
     drone_addr: PARROT_SPHINX_IP,
-    send_datetime: true,
+    // @TODO: Once we fix the Date Time sending, set to `TRUE`
+    send_datetime: false,
 };
 
 pub mod ardrone3;
@@ -135,18 +136,18 @@ fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
     std::thread::spawn(move || loop {
         let mut buf = [0; 256];
         if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
-            println!("Read {} bytes from {}", bytes_read, origin.ip());
-
-
-            print_message(&buf);
+            println!("Read {} bytes from {} ", bytes_read, origin.ip());
+            let octal: Vec<String> = buf[0..bytes_read].iter().map(|byte| format!("{:#o}", byte)).collect();
+            println!("{}", octal.join(" "));
         }
     });
+
     Ok(())
 }
 
 fn print_message(buf: &[u8]) {
     for b in buf.iter() {
-        print!("0x{:x} ", b);
+        print!("{:#o}", b);
     }
     println!();
 }
