@@ -2,9 +2,9 @@ use anyhow::Result as AnyResult;
 use arsdk_rs::{
     command::Feature::JumpingSumo as JumpingSumoFeature,
     frame::{BufferID, Frame, Type as FrameType},
+    jumping_sumo::PilotState,
     jumping_sumo::{Anim, Class::*, PilotingID::*},
-    Drone,
-    jumping_sumo::PilotState, Config
+    Config, Drone,
 };
 
 pub mod prelude {

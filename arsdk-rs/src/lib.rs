@@ -1,15 +1,21 @@
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use pnet::datalink;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
-use std::sync::mpsc::{channel, Sender};
+use std::{
+    io::{Read, Write},
+    sync::mpsc::{channel, Sender},
+};
 
 pub const INIT_PORT: u16 = 44444;
 pub const LISTEN_PORT: u16 = 43210;
 pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
-pub const PARROT_SPHINX_CONFIG: Config = Config { drone_addr: PARROT_SPHINX_IP, send_datetime: true };
+pub const PARROT_SPHINX_CONFIG: Config = Config {
+    drone_addr: PARROT_SPHINX_IP,
+    send_datetime: true,
+};
 
 pub mod ardrone3;
 pub mod command;
@@ -18,7 +24,7 @@ pub mod frame;
 pub mod jumping_sumo;
 
 pub mod prelude {
-    pub use crate::{PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP, Config, Drone};
+    pub use crate::{Config, Drone, PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP};
 }
 
 #[derive(Debug)]
@@ -45,8 +51,12 @@ impl Drone {
     /// * Perfroms Handshake at INIT_PORT
     /// * Spawns Command sender at `c2d_port`
     pub fn connect(config: Config) -> AnyResult<Self> {
-        let local_ip = local_ip(config.drone_addr)
-            .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", config.drone_addr))?;
+        let local_ip = local_ip(config.drone_addr).ok_or_else(|| {
+            anyhow!(
+                "couldn't find local ip in the target network {}",
+                config.drone_addr
+            )
+        })?;
 
         let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
         spawn_listener(local_listener)?;
@@ -160,16 +170,19 @@ fn perform_handshake(target: SocketAddr, d2c_port: u16) -> AnyResult<HandshakeRe
     let mut handshake_stream =
         retry(10, target).ok_or_else(|| anyhow!("Couldn't connect for handshake {}", target))?;
 
-    // Send handshake
-    serde_json::to_writer(&mut handshake_stream, &handshake_message)?;
-    // Receive response
-    let handshake_response = HandshakeResponse::deserialize(
-        &mut serde_json::Deserializer::from_reader(&handshake_stream),
-    )?;
-    if handshake_response.status != 0 {
-        anyhow!("connection refused - {:?}", handshake_response);
+    let write_string = serde_json::to_string(&handshake_message)?;
+
+    handshake_stream.write_all(write_string.as_bytes())?;
+
+    let mut handshake_json = String::new();
+    handshake_stream.read_to_string(&mut handshake_json)?;
+
+    let response: HandshakeResponse = serde_json::from_str(&handshake_json)?;
+
+    if response.status != 0 {
+        anyhow!("connection refused - {:?}", response);
     }
-    Ok(handshake_response)
+    Ok(response)
 }
 
 fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
@@ -178,10 +191,10 @@ fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
         let mut buf = [0; 1024];
         if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
             println!("Read {} bytes from {}", bytes_read, origin.ip());
-            println!(
-                "{}",
-                String::from_utf8(buf.to_vec()).unwrap_or_else(|_| "unknown".to_string())
-            );
+
+            let buffer = buf.iter().map(|byte| format!("{:#o}", byte));
+
+            println!("{:?}", &buffer);
         }
     });
     Ok(())
