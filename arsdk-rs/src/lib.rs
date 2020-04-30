@@ -4,6 +4,7 @@ use pnet::datalink;
 use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc::{channel, Sender};
+use chrono::{offset::Utc, DateTime};
 
 const INIT_PORT: u16 = 44444;
 const LISTEN_PORT: u16 = 43210;
@@ -12,6 +13,7 @@ pub mod command;
 pub mod common;
 pub mod frame;
 pub mod jumping_sumo;
+pub mod ardrone3;
 
 pub struct Drone {
     // Each frame::BufferID gets its own sequence_id
@@ -20,6 +22,26 @@ pub struct Drone {
 }
 
 impl Drone {
+    pub fn new(addr: IpAddr) -> AnyResult<Self> {
+        let local_ip = local_ip(addr)
+            .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", addr))?;
+
+        let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
+        spawn_listener(local_listener)?;
+
+        let init_addr = SocketAddr::new(addr, INIT_PORT);
+        let handshake_response = perform_handshake(init_addr, local_listener.port())?;
+
+        let cmd_sender_addr = SocketAddr::new(addr, handshake_response.c2d_port);
+
+        println!("spawning cmd sender on {}", cmd_sender_addr);
+        let sender = spawn_cmd_sender(local_ip, cmd_sender_addr)?;
+        Ok(Self {
+            sequence_ids: DashMap::new(),
+            sender,
+        })
+    }
+
     pub fn send_frame(&self, frame: frame::Frame) -> AnyResult<()> {
         self.send_raw_frame_unchecked(frame)
     }
@@ -30,6 +52,23 @@ impl Drone {
 
     fn send(&self, raw_frame: Vec<u8>) -> AnyResult<()> {
         self.sender.send(raw_frame).map_err(AnyError::new)
+    }
+
+    pub fn send_date_time(&self, date: DateTime<Utc>) -> AnyResult<()> {
+        use command::Feature::Common;
+        use common::Class;
+        use frame::{BufferID, Type, Frame};
+
+        let date_feature = Common(Class::Common(common::Common::CurrentDate(date)));
+
+        let frame = Frame::for_drone(self, Type::DataWithAck, BufferID::CDAck, date_feature);
+
+        self.send_frame(frame)?;
+
+        let time_feature = Common(Class::Common(common::Common::CurrentTime(date)));
+        let frame = Frame::for_drone(self, Type::DataWithAck, BufferID::CDAck, time_feature);
+
+        self.send_frame(frame)
     }
 
     pub(crate) fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
@@ -58,6 +97,10 @@ struct HandshakeMessage {
     controller_name: String,
     controller_type: String,
     d2c_port: u16,
+    // #[serde(skip_serializing_if = "Option::is_some")]
+    // arstream2_client_stream_port: Option<u16>,
+    // #[serde(skip_serializing_if = "Option::is_some")]
+    // arstream2_client_control_port: Option<u16>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -71,11 +114,13 @@ struct HandshakeResponse {
     status: i8,
 }
 
-fn perform_handshake(target: impl ToSocketAddrs, d2c_port: u16) -> AnyResult<HandshakeResponse> {
+fn perform_handshake(target: SocketAddr, d2c_port: u16) -> AnyResult<HandshakeResponse> {
     let handshake_message = HandshakeMessage {
         controller_name: "Drone-rs".to_string(),
         controller_type: "computer".to_string(),
         d2c_port,
+        // arstream2_client_stream_port: Some(44445),
+        // arstream2_client_control_port: Some(44446),
     };
 
     println!(
@@ -83,7 +128,7 @@ fn perform_handshake(target: impl ToSocketAddrs, d2c_port: u16) -> AnyResult<Han
         handshake_message.controller_name,
     );
 
-    let mut handshake_stream = TcpStream::connect(target)?;
+    let mut handshake_stream = retry(10, target).ok_or_else(|| anyhow!("Couldn't connect for handshake {}", target))?;
 
     // Send handshake
     serde_json::to_writer(&mut handshake_stream, &handshake_message)?;
@@ -138,23 +183,14 @@ fn spawn_cmd_sender(local_ip: IpAddr, target_addr: SocketAddr) -> AnyResult<Send
     Ok(tx)
 }
 
-impl Drone {
-    pub fn new(addr: IpAddr) -> AnyResult<Self> {
-        let local_ip = local_ip(addr)
-            .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", addr))?;
-
-        let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
-        spawn_listener(local_listener)?;
-
-        let handshake_response = perform_handshake((addr, INIT_PORT), local_listener.port())?;
-
-        let cmd_sender_addr = SocketAddr::new(addr, handshake_response.c2d_port);
-
-        println!("spawning cmd sender on {}", cmd_sender_addr);
-        let sender = spawn_cmd_sender(local_ip, cmd_sender_addr)?;
-        Ok(Self {
-            sequence_ids: DashMap::new(),
-            sender,
-        })
+fn retry(retry: usize, target: SocketAddr) -> Option<TcpStream> {
+    let timeout = std::time::Duration::from_secs(2);
+    for retry_time in 0..retry {
+        match TcpStream::connect_timeout(&target, timeout) {
+            Ok(stream) => return Some(stream),
+            Err(err) => eprintln!("Error connecting to Tcp ({}): {}", retry_time, err),
+        };
     }
+
+    None
 }
