@@ -1,24 +1,24 @@
 use anyhow::Result as AnyResult;
+use arsdk_rs::{
+    command::Feature,
+    frame::{BufferID, Frame, Type},
+};
 use chrono::Utc;
 use std::net::IpAddr;
-use arsdk_rs::{command::Feature, frame::{Type, Frame, BufferID}};
 
-pub use arsdk_rs::{Drone, ardrone3::ArDrone3};
-
+pub use arsdk_rs::{ardrone3::ArDrone3, Drone, PARROT_SPHINX_IP};
 
 pub struct Bebop2 {
     drone: Drone,
 }
 
 impl Bebop2 {
-    pub fn new(addr: IpAddr) -> AnyResult<Self> {
+    pub fn connect(addr: IpAddr) -> AnyResult<Self> {
         let drone = Drone::new(addr)?;
 
         drone.send_date_time(Utc::now())?;
 
-        Ok(Self {
-            drone
-        })
+        Ok(Self { drone })
     }
 
     pub fn take_off(&self) -> AnyResult<()> {

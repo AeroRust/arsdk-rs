@@ -1,19 +1,20 @@
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
+use chrono::{offset::Utc, DateTime};
 use dashmap::DashMap;
 use pnet::datalink;
 use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc::{channel, Sender};
-use chrono::{offset::Utc, DateTime};
 
-const INIT_PORT: u16 = 44444;
-const LISTEN_PORT: u16 = 43210;
+pub const INIT_PORT: u16 = 44444;
+pub const LISTEN_PORT: u16 = 43210;
+pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
 
+pub mod ardrone3;
 pub mod command;
 pub mod common;
 pub mod frame;
 pub mod jumping_sumo;
-pub mod ardrone3;
 
 pub struct Drone {
     // Each frame::BufferID gets its own sequence_id
@@ -22,6 +23,11 @@ pub struct Drone {
 }
 
 impl Drone {
+    /// Connects to drone
+
+    /// Spawns Listener at LISTENER_PORT
+    /// Perfroms Handshake at INIT_PORT
+    /// Spawns Command sender at `c2d_port`
     pub fn new(addr: IpAddr) -> AnyResult<Self> {
         let local_ip = local_ip(addr)
             .ok_or_else(|| anyhow!("couldn't find local ip in the target network {}", addr))?;
@@ -57,7 +63,7 @@ impl Drone {
     pub fn send_date_time(&self, date: DateTime<Utc>) -> AnyResult<()> {
         use command::Feature::Common;
         use common::Class;
-        use frame::{BufferID, Type, Frame};
+        use frame::{BufferID, Frame, Type};
 
         let date_feature = Common(Class::Common(common::Common::CurrentDate(date)));
 
@@ -128,7 +134,8 @@ fn perform_handshake(target: SocketAddr, d2c_port: u16) -> AnyResult<HandshakeRe
         handshake_message.controller_name,
     );
 
-    let mut handshake_stream = retry(10, target).ok_or_else(|| anyhow!("Couldn't connect for handshake {}", target))?;
+    let mut handshake_stream =
+        retry(10, target).ok_or_else(|| anyhow!("Couldn't connect for handshake {}", target))?;
 
     // Send handshake
     serde_json::to_writer(&mut handshake_stream, &handshake_message)?;
