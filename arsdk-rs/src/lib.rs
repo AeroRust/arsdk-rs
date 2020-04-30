@@ -2,12 +2,8 @@ use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use pnet::datalink;
-use serde::{Deserialize, Serialize};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
-use std::{
-    io::{Read, Write},
-    sync::mpsc::{channel, Sender},
-};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket};
+use std::sync::mpsc::{channel, Sender};
 
 pub const INIT_PORT: u16 = 44444;
 pub const LISTEN_PORT: u16 = 43210;
@@ -21,7 +17,10 @@ pub mod ardrone3;
 pub mod command;
 pub mod common;
 pub mod frame;
+mod handshake;
 pub mod jumping_sumo;
+
+pub(crate) use handshake::perform_handshake;
 
 pub mod prelude {
     pub use crate::{Config, Drone, PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP};
@@ -131,70 +130,15 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
         .next()
 }
 
-#[derive(Serialize)]
-struct HandshakeMessage {
-    controller_name: String,
-    controller_type: String,
-    d2c_port: u16,
-    // #[serde(skip_serializing_if = "Option::is_some")]
-    // arstream2_client_stream_port: Option<u16>,
-    // #[serde(skip_serializing_if = "Option::is_some")]
-    // arstream2_client_control_port: Option<u16>,
-}
-
-#[derive(Deserialize, Debug)]
-struct HandshakeResponse {
-    arstream_fragment_maximum_number: u8,
-    arstream_fragment_size: u16,
-    arstream_max_ack_interval: i8,
-    c2d_port: u16,
-    c2d_update_port: u16,
-    c2d_user_port: u16,
-    status: i8,
-}
-
-fn perform_handshake(target: SocketAddr, d2c_port: u16) -> AnyResult<HandshakeResponse> {
-    let handshake_message = HandshakeMessage {
-        controller_name: "arsdk-rs".to_string(),
-        controller_type: "computer".to_string(),
-        d2c_port,
-        // arstream2_client_stream_port: Some(44445),
-        // arstream2_client_control_port: Some(44446),
-    };
-
-    println!(
-        "connecting controller {}",
-        handshake_message.controller_name,
-    );
-
-    let mut handshake_stream =
-        retry(10, target).ok_or_else(|| anyhow!("Couldn't connect for handshake {}", target))?;
-
-    let write_string = serde_json::to_string(&handshake_message)?;
-
-    handshake_stream.write_all(write_string.as_bytes())?;
-
-    let mut handshake_json = String::new();
-    handshake_stream.read_to_string(&mut handshake_json)?;
-
-    let response: HandshakeResponse = serde_json::from_str(&handshake_json)?;
-
-    if response.status != 0 {
-        anyhow!("connection refused - {:?}", response);
-    }
-    Ok(response)
-}
-
 fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
     let listener = UdpSocket::bind(addr)?;
     std::thread::spawn(move || loop {
-        let mut buf = [0; 1024];
+        let mut buf = [0; 256];
         if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
             println!("Read {} bytes from {}", bytes_read, origin.ip());
 
-            let buffer = buf.iter().map(|byte| format!("{:#o}", byte));
 
-            println!("{:?}", &buffer);
+            print_message(&buf);
         }
     });
     Ok(())
@@ -224,16 +168,4 @@ fn spawn_cmd_sender(local_ip: IpAddr, target_addr: SocketAddr) -> AnyResult<Send
         println!("sent {}", size);
     });
     Ok(tx)
-}
-
-fn retry(retry: usize, target: SocketAddr) -> Option<TcpStream> {
-    let timeout = std::time::Duration::from_secs(2);
-    for retry_time in 0..retry {
-        match TcpStream::connect_timeout(&target, timeout) {
-            Ok(stream) => return Some(stream),
-            Err(err) => eprintln!("Error connecting to Tcp ({}): {}", retry_time, err),
-        };
-    }
-
-    None
 }
