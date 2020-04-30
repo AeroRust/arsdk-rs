@@ -1,4 +1,3 @@
-
 use crate::frame::Data;
 
 /// eARCOMMANDS_ID_ARDRONE3_PILOTING_CMD
@@ -35,7 +34,6 @@ pub enum ArDrone3 {
     StopPilotedPOI = 13,
 }
 
-
 impl Data for ArDrone3 {
     fn serialize(&self) -> Vec<u8> {
         // todo: Fix this hardcoded value
@@ -44,5 +42,4 @@ impl Data for ArDrone3 {
 
         take_off.to_be_bytes().to_vec()
     }
-
 }

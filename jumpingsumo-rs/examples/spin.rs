@@ -1,6 +1,6 @@
+use jumpingsumo_rs::{JumpingSumo, PilotState};
 use std::error::Error;
 use std::net::IpAddr;
-use jumpingsumo_rs::{JumpingSumo, PilotState};
 fn main() -> Result<(), Box<dyn Error>> {
     let drone_address = "192.168.2.1".parse::<IpAddr>()?;
 

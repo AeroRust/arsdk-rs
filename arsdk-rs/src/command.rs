@@ -1,7 +1,7 @@
+use crate::ardrone3::ArDrone3;
 use crate::common;
 use crate::frame::Data;
 use crate::jumping_sumo;
-use crate::ardrone3::ArDrone3;
 #[derive(Debug, PartialEq, Clone, Copy)]
 
 pub enum Feature {

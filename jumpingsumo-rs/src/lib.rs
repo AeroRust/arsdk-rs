@@ -1,7 +1,7 @@
 use anyhow::Result as AnyResult;
 use arsdk_rs::command::Feature::{Common as CommonFeature, JumpingSumo as JumpingSumoFeature};
 use arsdk_rs::common;
-use arsdk_rs::frame::{Frame, BufferID, Type as FrameType};
+use arsdk_rs::frame::{BufferID, Frame, Type as FrameType};
 use arsdk_rs::jumping_sumo::Anim;
 use arsdk_rs::jumping_sumo::Class::*;
 use arsdk_rs::jumping_sumo::PilotingID::*;
@@ -83,7 +83,12 @@ impl JumpingSumo {
 
     pub fn jump(&self) -> AnyResult<()> {
         let feature = JumpingSumoFeature(Animations(Anim::Jump));
-        let frame = Frame::for_drone(&self.drone, FrameType::DataWithAck, BufferID::CDAck, feature);
+        let frame = Frame::for_drone(
+            &self.drone,
+            FrameType::DataWithAck,
+            BufferID::CDAck,
+            feature,
+        );
 
         self.drone.send_frame(frame)
     }
@@ -91,14 +96,24 @@ impl JumpingSumo {
     fn send_date(&self, date: DateTime<Utc>) -> AnyResult<()> {
         let feature = CommonFeature(common::Class::Common(common::Common::CurrentDate(date)));
 
-        let frame = Frame::for_drone(&self.drone, FrameType::DataWithAck, BufferID::CDAck, feature);
+        let frame = Frame::for_drone(
+            &self.drone,
+            FrameType::DataWithAck,
+            BufferID::CDAck,
+            feature,
+        );
 
         self.drone.send_frame(frame)
     }
 
     fn send_time(&self, date: DateTime<Utc>) -> AnyResult<()> {
         let feature = CommonFeature(common::Class::Common(common::Common::CurrentTime(date)));
-        let frame = Frame::for_drone(&self.drone, FrameType::DataWithAck, BufferID::CDAck, feature);
+        let frame = Frame::for_drone(
+            &self.drone,
+            FrameType::DataWithAck,
+            BufferID::CDAck,
+            feature,
+        );
 
         self.drone.send_frame(frame)
     }
