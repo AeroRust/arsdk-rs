@@ -1,12 +1,9 @@
 use std::error::Error;
-use std::net::IpAddr;
 
-use jumpingsumo_rs::JumpingSumo;
+use jumpingsumo_rs::prelude::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let drone_address = "192.168.2.1".parse::<IpAddr>()?;
-
-    let js = JumpingSumo::new(drone_address)?;
+    let js = JumpingSumo::connect(PARROT_SPHINX_CONFIG)?;
 
     std::thread::sleep(std::time::Duration::from_secs(2));
 

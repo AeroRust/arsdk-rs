@@ -1,3 +1,4 @@
+use crate::ardrone3::ArDrone3;
 use crate::common;
 use crate::frame::Data;
 use crate::jumping_sumo;
@@ -5,7 +6,7 @@ use crate::jumping_sumo;
 
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
-    Ardrone3,                         // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
+    ArDrone3(ArDrone3),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
     Minidrone,                        // ARCOMMANDS_ID_FEATURE_MINIDRONE = 2,
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
     SkyController,                    // ARCOMMANDS_ID_FEATURE_SKYCONTROLLER = 4,
@@ -30,7 +31,7 @@ impl Into<u8> for Feature {
     fn into(self) -> u8 {
         match self {
             Self::Common(_) => 0,
-            Self::Ardrone3 => 1,
+            Self::ArDrone3(_) => 1,
             Self::Minidrone => 2,
             Self::JumpingSumo(_) => 3,
             Self::SkyController => 4,
@@ -62,6 +63,9 @@ impl Data for Feature {
             Feature::Common(common) => {
                 buf.extend(common.serialize());
             }
+            Feature::ArDrone3(drone) => {
+                buf.extend(drone.serialize());
+            }
             _ => {}
         }
         buf
@@ -79,7 +83,7 @@ mod command_tests {
             Feature::Common(common::Class::Common(common::Common::AllStates)),
             0,
         );
-        assert_feature(Feature::Ardrone3, 1);
+        assert_feature(Feature::ArDrone3(ArDrone3::TakeOff), 1);
         assert_feature(Feature::Minidrone, 2);
         assert_feature(
             Feature::JumpingSumo(jumping_sumo::Class::Piloting(
