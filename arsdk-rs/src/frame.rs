@@ -76,13 +76,56 @@ pub enum Type {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum BufferID {
-    CDNonAck = 10,    //#define BD_NET_CD_NONACK_ID 10
-    CDAck = 11,       //#define BD_NET_CD_ACK_ID 11
-    CDEmergency = 12, // #define BD_NET_CD_EMERGENCY_ID 12
-    CDVideoAck = 13,  // #define BD_NET_CD_VIDEO_ACK_ID 13
-    DCVideo = 125,    // #define BD_NET_DC_VIDEO_DATA_ID 125
-    DCEvent = 126,    // #define BD_NET_DC_EVENT_ID 126
-    DCNavdata = 127,  // #define BD_NET_DC_NAVDATA_ID 127
+    /// pings from device
+    PING = 0,
+    /// respond to pings
+    PONG = 1,
+    /// C:
+    /// #define BD_NET_CD_NONACK_ID 10
+    ///
+    /// PyParrot:
+    /// 'SEND_NO_ACK': 10, # not-ack commandsandsensors (piloting and camera rotations)
+    CDNonAck = 10,
+    /// C:
+    /// `#define BD_NET_CD_ACK_ID 11`
+    ///
+    /// PyParrot:
+    /// 'SEND_WITH_ACK': 11, # ack commandsandsensors (all piloting commandsandsensors)
+    CDAck = 11,
+    /// C:
+    /// `#define BD_NET_CD_EMERGENCY_ID 12`
+    ///
+    /// PyParrot:
+    /// `'SEND_HIGH_PRIORITY': 12, # emergency commandsandsensors`
+    CDEmergency = 12,
+    /// C:
+    /// #define BD_NET_CD_VIDEO_ACK_ID 13
+    ///
+    /// PyParrot:
+    /// `'VIDEO_ACK': 13, # ack for video`
+    CDVideoAck = 13,
+    /// C:
+    /// #define BD_NET_DC_VIDEO_DATA_ID 125
+    ///
+    /// PyParrot:
+    /// `'VIDEO_DATA' : 125, # video data`
+    DCVideo = 125,
+    /// C:
+    /// #define BD_NET_DC_EVENT_ID 126
+    ///
+    /// PyParrot:
+    // 'NO_ACK_DRONE_DATA' : 126, # data from drone (including battery and others), no ack
+    ///
+    DCEvent = 126,
+    /// C:
+    /// #define BD_NET_DC_NAVDATA_ID 127
+    ///
+    /// PyParrot:
+    /// `'ACK_DRONE_DATA' : 127, # drone data that needs an ack`
+    DCNavdata = 127,
+    // @TODO: Find the corresponding C definition if there is one and name the new enum variant!
+    // PyParrot:
+    // `'ACK_FROM_SEND_WITH_ACK': 139  # 128 + buffer id for 'SEND_WITH_ACK' is 139`
 }
 
 // --------------------- Conversion impls --------------------- //
@@ -133,6 +176,8 @@ impl TryFrom<u8> for BufferID {
 impl Into<u8> for BufferID {
     fn into(self) -> u8 {
         match self {
+            Self::PING => 0,
+            Self::PONG => 1,
             Self::CDNonAck => 10,
             Self::CDAck => 11,
             Self::CDEmergency => 12,
