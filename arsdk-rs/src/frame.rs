@@ -161,6 +161,8 @@ impl TryFrom<u8> for BufferID {
     type Error = AnyError;
     fn try_from(v: u8) -> AnyResult<Self> {
         match v {
+            0 => Ok(Self::PING),
+            1 => Ok(Self::PONG),
             10 => Ok(Self::CDNonAck),
             11 => Ok(Self::CDAck),
             12 => Ok(Self::CDEmergency),
