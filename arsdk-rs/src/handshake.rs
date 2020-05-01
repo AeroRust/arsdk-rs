@@ -62,7 +62,7 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
     handshake_stream.read_to_string(&mut response_string)?;
     let response_string = response_string.trim_end_matches("\u{0}");
 
-    let response: Response = serde_json::from_str(&dbg!(response_string))?;
+    let response: Response = serde_json::from_str(&response_string)?;
 
     if response.status != 0 {
         anyhow!("connection refused - {:?}", response);

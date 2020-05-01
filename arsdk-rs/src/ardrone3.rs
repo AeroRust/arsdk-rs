@@ -40,6 +40,6 @@ impl Data for ArDrone3 {
 
         let take_off: u16 = 1;
 
-        take_off.to_be_bytes().to_vec()
+        take_off.to_le_bytes().to_vec()
     }
 }

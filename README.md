@@ -17,18 +17,41 @@ https://developer.parrot.com/docs/sphinx/
 
 2. Simulate drone
 
-```
+```bash
 sphinx /opt/parrot-sphinx/usr/share/sphinx/drones/{DRONE}.drone::stolen_interface={YOUR_INTERFACE}:eth0:192.168.42.1/24
 ```
 
-Available drones:
+**NOTE:** Since we don't have video streaming handling from the drone, you should disable the front camera for `Bebeop2` (`::with_front_cam=0`).
+Otherwise you won't be able to connect (performa a handshake) to it:
 
 ```bash
-$ ls /opt/parrot-sphinx/usr/share/sphinx/drones/
+sphinx /opt/parrot-sphinx/usr/share/sphinx/drones/{DRONE}.drone::stolen_interface={YOUR_INTERFACE}:eth0:192.168.42.1/24::with_front_cam=0
 ```
-> airborne.drone  anafi4k.drone  bebop2.drone  bebop.drone  bluegrass.drone  disco.drone  mambo.drone  swing.drone
 
-Run examples with IP:
+
+* *You can find your interface with:*
+    ```bash
+    iwconfig
+    ```
+
+* Available drones:
+
+    ```bash
+    ls -1a /opt/parrot-sphinx/usr/share/sphinx/drones/
+    ```
+
+    * airborne.drone
+    * anafi4k.drone
+    * bebop2.drone
+    * bebop.drone
+    * bluegrass.drone
+    * disco.drone
+    * mambo.drone
+    * swing.drone
+
+
+3. Run examples with IP:
+
 ```rust
 use arsdk-rs::PARROT_SPHINX_IP;
 use std::net::{IpAddr, Ipv4Addr};
@@ -39,9 +62,15 @@ fn main() {
 }
 ```
 
+### Telemetery
+
+Documetation:
+* https://developer.parrot.com/docs/sphinx/visualization.html#tlm-data-logger
 
 
-###
+```bash
+tlm-data-logger inet:127.0.0.1:9060
+```
 
 
 ## Code of Conduct
