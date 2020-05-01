@@ -11,7 +11,7 @@ pub trait Data {
     fn serialize(&self) -> Vec<u8>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
     frame_type: Type,
     buffer_id: BufferID,
@@ -64,7 +64,7 @@ impl IntoRawFrame for Frame {
 
 // --------------------- Types --------------------- //
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Type {
     Uninitialized = 0, // ARNETWORKAL_FRAME_TYPE_UNINITIALIZED 0
     Ack = 1,           // ARNETWORKAL_FRAME_TYPE_ACK 1
@@ -188,6 +188,121 @@ impl Into<u8> for BufferID {
             Self::DCEvent => 126,
             Self::DCNavdata => 127,
         }
+    }
+}
+
+pub mod impl_scroll {
+    use super::*;
+    use crate::command::Feature;
+
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Frame {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let offset = &mut 0;
+
+            let frame_type = src.gread_with(offset, endian)?;
+            let buffer_id = src.gread_with(offset, endian)?;
+            let sequence_id = src.gread_with(offset, endian)?;
+            let buf_len: u32 = src.gread_with(offset, endian)?;
+            let feature = src.gread_with(offset, endian)?;
+
+            if buf_len != *offset as u32 {
+                // type u8 buffer_id: u8 sequence_id: u8 buf_len: u32 feature
+                let error = format!("Expected {} got {} bytes of whole Frame", buf_len, *offset - 1);
+                return Err(scroll::Error::Custom(error));
+            }
+
+            Ok((Frame { frame_type, buffer_id, sequence_id, feature }, *offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Frame {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let offset = &mut 0;
+
+            this.gwrite_with::<u8>(self.frame_type.into(), offset, ctx)?;
+            this.gwrite_with::<u8>(self.buffer_id.into(), offset, ctx)?;
+            this.gwrite_with::<u8>(self.sequence_id.into(), offset, ctx)?;
+
+            let buf_length_offset = *offset;
+            // reserve bytes for the buffer length (u32)
+            this.gwrite_with::<u32>(0, offset, ctx)?;
+            let feature_length = this.gwrite_with::<Feature>(self.feature, offset, ctx)?;
+            // 7 bytes + feature_length bytes = buf.length
+            let written = 7 + feature_length;
+            this.pwrite_with::<u32>(written as u32, buf_length_offset, ctx)?;
+
+            Ok(written)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Type {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], _endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let offset = &mut 0;
+            let frame_value = src.gread::<u8>(offset)?;
+
+            Type::try_from(frame_value)
+            .map(|frame_type| (frame_type, *offset))
+            .map_err(|err| scroll::Error::Custom(err.to_string()))
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for BufferID {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], _endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let offset = &mut 0;
+            let id_value = src.gread::<u8>(offset)?;
+
+            BufferID::try_from(id_value)
+            .map(|buffer_id| (buffer_id, *offset))
+            .map_err(|err| scroll::Error::Custom(err.to_string()))
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::jumping_sumo::*;
+        use scroll::{LE, Pwrite};
+
+        #[test]
+        fn test_full_frame() {
+            let message: [u8; 14] = [0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c];
+
+            let pilot_state = PilotState {
+                flag: true,
+                speed: 0,
+                turn: -100,
+            };
+
+            let expected_frame = Frame {
+                frame_type: Type::Data,
+                buffer_id: BufferID::CDNonAck,
+                sequence_id: 103,
+                feature: command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(pilot_state))),
+            };
+
+            let actual_frame: Frame = message.pread_with(0, LE).unwrap();
+
+            assert_eq!(expected_frame, actual_frame);
+
+            let mut actual_message: [u8; 14] = [0; 14];
+            actual_message.pwrite_with(actual_frame, 0, LE).expect("whoopsy");
+
+            assert_eq!(message, actual_message)
+        }
+
     }
 }
 

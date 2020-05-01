@@ -1,7 +1,7 @@
 use crate::frame::Data;
 use chrono::{offset::Utc, DateTime};
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Class {
     Network,                 // ARCOMMANDS_ID_COMMON_CLASS_NETWORK = 0,
     NetworkEvent,            // ARCOMMANDS_ID_COMMON_CLASS_NETWORKEVENT = 1,
@@ -39,7 +39,7 @@ pub enum Class {
     Factory,                 // ARCOMMANDS_ID_COMMON_CLASS_FACTORY = 31,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Common {
     AllStates,                  // ARCOMMANDS_ID_COMMON_COMMON_CMD_ALLSTATES = 0,
     CurrentDate(DateTime<Utc>), // ARCOMMANDS_ID_COMMON_COMMON_CMD_CURRENTDATE = 1,
@@ -144,6 +144,106 @@ impl Into<u8> for Common {
     }
 }
 
+pub mod scroll_impl {
+    use super::*;
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => Self::Network,
+                1 => Self::NetworkEvent,
+                2 => Self::Settings,
+                3 => Self::SettingsState,
+                4 => {
+                    let common = src.gread_with(&mut offset, endian)?;
+
+                    Self::Common(common)
+                }
+                5 => Self::CommonState,
+                6 => Self::Overheat,
+                7 => Self::OverheatState,
+                8 => Self::Controller,
+                9 => Self::WifiSettings,
+                10 => Self::WifiSettingsState,
+                11 => Self::Mavlink,
+                12 => Self::MavlinkState,
+                13 => Self::Calibration,
+                14 => Self::CalibrationState,
+                15 => Self::CameraSettingsState,
+                16 => Self::Gps,
+                17 => Self::FlightPlanState,
+                18 => Self::ArLibsVersionsState,
+                19 => Self::FlightPlanEvent,
+                20 => Self::Audio,
+                21 => Self::AudioState,
+                22 => Self::HeadLights,
+                23 => Self::HeadLightsState,
+                24 => Self::Animations,
+                25 => Self::AnimationsState,
+                26 => Self::Accessory,
+                27 => Self::AccessoryState,
+                28 => Self::Charger,
+                29 => Self::ChargerState,
+                30 => Self::Runstate,
+                31 => Self::Factory,
+                32 => Self::FlightPlanSettings,
+                33 => Self::FlightPlanSettingsState,
+                _ => return Err(scroll::Error::Custom("Out of range".into())),
+            };
+
+            Ok((class, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Common {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
+            let ser_common = self.serialize();
+            let written = this.pwrite_with(ser_common.as_slice(), 0, ())?;
+
+            Ok(written)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Common {
+        type Error = scroll::Error;
+
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            use Common::*;
+            let mut offset = 0;
+
+            let common = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => AllStates,
+                // @TODO: FIX THIS!
+                1 => CurrentDate(Utc::now()),
+                // @TODO: FIX THIS!
+                2 => CurrentTime(Utc::now()),
+                3 => Reboot,
+                _ => return Err(scroll::Error::Custom("Out of range".into())),
+            };
+
+            Ok((common, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Class {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
+            let ser_class = self.serialize();
+            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+
+            Ok(written)
+        }
+    }
+}
 // --------------------- Tests --------------------- //
 
 #[cfg(test)]

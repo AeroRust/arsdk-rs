@@ -1,13 +1,13 @@
 use crate::frame::Data;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum JumpType {
     LONG,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     HIGH,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     DEFAULT, // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Class {
     Piloting(PilotingID), // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     PilotingState,        // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTINGSTATE = 1,
@@ -33,7 +33,7 @@ pub enum Class {
     VideoSettingsState,   // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_VIDEOSETTINGSSTATE = 22,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Anim {
     JumpStop = 0,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPSTOP = 0,
     JumpCancel = 1,      // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPCANCEL = 1,
@@ -42,14 +42,14 @@ pub enum Anim {
     SimpleAnimation = 4, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PilotingID {
     Pilot(PilotState), // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_PCMD = 0,
     Posture,           // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_POSTURE = 1,
     AddCapOffset,      // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_ADDCAPOFFSET = 2,
 }
 
-#[derive(Default, Debug, PartialEq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct PilotState {
     pub flag: bool,
     pub speed: i8,
@@ -147,6 +147,132 @@ impl Into<u16> for PilotingID {
             Self::Pilot(_) => 0,
             Self::Posture => 1,
             Self::AddCapOffset => 2,
+        }
+    }
+}
+pub mod scroll_impl {
+    use super::*;
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => {
+                    let pilot_state = src.gread_with(&mut offset, endian)?;
+
+                    Self::Piloting(pilot_state)
+                }
+                1 => Self::PilotingState,
+                // TODO: Impl animcation `TryFromCtx`
+                2 => Self::Animations(Anim::Jump),
+                3 => Self::AnimationsState,
+                5 => Self::SettingsState,
+                6 => Self::MediaRecord,
+                7 => Self::MediaRecordState,
+                8 => Self::NetworkSettings,
+                9 => Self::NetworkSettingsState,
+                10 => Self::Network,
+                11 => Self::NetworkState,
+                12 => Self::AutioSettings,
+                13 => Self::AudioSettingsState,
+                14 => Self::Roadplan,
+                15 => Self::RoadplanState,
+                16 => Self::SpeedSettings,
+                17 => Self::SpeedSettingsState,
+                18 => Self::MediaStreaming,
+                19 => Self::MediaStreamingState,
+                20 => Self::MediaRecordEvent,
+                21 => Self::VideoSettings,
+                22 => Self::VideoSettingsState,
+                _ => return Err(scroll::Error::Custom("Out of range".into())),
+            };
+
+            Ok((class, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Class {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
+            let ser_class = self.serialize();
+            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+
+            Ok(written)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for PilotingID {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let piloting_id = match src.gread_with::<u16>(&mut offset, endian)? {
+                0 => {
+                    let pilot_state = src.gread_with(&mut offset, endian)?;
+
+                    Self::Pilot(pilot_state)
+                }
+                1 => Self::Posture,
+                2 => Self::AddCapOffset,
+                _ => return Err(scroll::Error::Custom("Out of range".into())),
+            };
+
+            Ok((piloting_id, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for PilotingID {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
+            let ser_class = self.serialize();
+            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+
+            Ok(written)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for PilotState {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let flag = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => false,
+                1 => true,
+                _ => {
+                    return Err(scroll::Error::Custom(
+                        "`flag` is out of range it can only be true or false".into(),
+                    ))
+                }
+            };
+            let speed: i8 = src.gread_with(&mut offset, endian)?;
+            let turn: i8 = src.gread_with(&mut offset, endian)?;
+
+            let pilot_state = PilotState { flag, speed, turn };
+
+            Ok((pilot_state, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for PilotState {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
+            let ser_class = self.serialize();
+            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+
+            Ok(written)
         }
     }
 }

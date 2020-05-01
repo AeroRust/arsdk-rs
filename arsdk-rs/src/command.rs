@@ -2,7 +2,7 @@ use crate::ardrone3::ArDrone3;
 use crate::common;
 use crate::frame::Data;
 use crate::jumping_sumo;
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
@@ -69,6 +69,68 @@ impl Data for Feature {
             _ => {}
         }
         buf
+    }
+}
+
+pub mod scroll_impl {
+    use super::*;
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Feature {
+        type Error = scroll::Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let feature = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => {
+                    let common = src.gread_with(&mut offset, endian)?;
+
+                    Self::Common(common)
+                },
+                1 => {
+                    let ardrone3 = src.gread_with(&mut offset, endian)?;
+
+                    Self::ArDrone3(ardrone3)
+                },
+                2 => Self::Minidrone,
+                3 => {
+                    let js_class = src.gread_with(&mut offset, endian)?;
+
+                    Self::JumpingSumo(js_class)
+                },
+                4 => Self::SkyController,
+                8 => Self::PowerUp,
+                133 => Self::Generic,
+                134 => Self::FollowMe,
+                135 => Self::Wifi,
+                136 => Self::RC,
+                137 => Self::DroneManager,
+                138 => Self::Mapper,
+                139 => Self::Debug,
+                140 => Self::ControllerInfo,
+                141 => Self::MapperMini,
+                142 => Self::ThermalCam,
+                144 => Self::Animation,
+                147 => Self::SequoiaCam,
+                _ => return Err(scroll::Error::Custom("Out of range".into()))
+            };
+
+            Ok((feature, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Feature {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
+            let ser_feature = self.serialize();
+            let written = this.pwrite_with(ser_feature.as_slice(), 0, ())?;
+
+
+            Ok(written)
+        }
     }
 }
 

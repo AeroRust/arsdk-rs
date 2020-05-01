@@ -22,6 +22,9 @@ impl Bebop2 {
         Ok(Self { drone })
     }
 
+    // ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_NAVIGATEHOME
+    // ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_AUTOTAKEOFFMODE
+
     pub fn take_off(&self) -> AnyResult<()> {
         // Ardrone3
         // ARCOMMANDS_ID_ARDRONE3_CLASS_PILOTING
