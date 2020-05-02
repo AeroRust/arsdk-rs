@@ -4,6 +4,7 @@ use dashmap::DashMap;
 use pnet::datalink;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc::{channel, Sender};
+use thiserror::Error;
 
 pub const INIT_PORT: u16 = 44444;
 pub const LISTEN_PORT: u16 = 43210;
@@ -25,6 +26,18 @@ pub(crate) use handshake::perform_handshake;
 
 pub mod prelude {
     pub use crate::{Config, Drone, PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP};
+}
+
+#[derive(Debug, Error)]
+pub enum MessageError {
+    #[error("Message parsing error")]
+    Scroll(#[from] scroll::Error),
+    #[error("Out of bound value {value}")]
+    Invalid {
+        // TODO: See how should we handle this for each individual case
+        // Use the largest possible value
+        value: u64,
+    },
 }
 
 #[derive(Debug)]
@@ -137,7 +150,10 @@ fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
         let mut buf = [0; 256];
         if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
             println!("Read {} bytes from {} ", bytes_read, origin.ip());
-            let octal: Vec<String> = buf[0..bytes_read].iter().map(|byte| format!("{:#o}", byte)).collect();
+            let octal: Vec<String> = buf[0..bytes_read]
+                .iter()
+                .map(|byte| format!("{:#o}", byte))
+                .collect();
             println!("{}", octal.join(" "));
         }
     });
