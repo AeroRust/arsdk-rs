@@ -1,6 +1,6 @@
 use crate::{command, Drone};
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
-use std::{convert::TryFrom};
+use std::convert::TryFrom;
 
 pub trait Data {
     fn serialize(&self) -> Vec<u8>;
@@ -35,7 +35,12 @@ impl Frame {
         buffer_id: BufferID,
         feature: Option<command::Feature>,
     ) -> Frame {
-        Frame::new(frame_type, buffer_id, drone.inner.sequence_id(buffer_id), feature)
+        Frame::new(
+            frame_type,
+            buffer_id,
+            drone.inner.sequence_id(buffer_id),
+            feature,
+        )
     }
 }
 
@@ -192,7 +197,7 @@ impl Into<u8> for BufferID {
 
 pub mod impl_scroll {
     use super::*;
-    use crate::{MessageError, command::Feature};
+    use crate::{command::Feature, MessageError};
 
     use scroll::{ctx, Endian, Pread, Pwrite};
 
@@ -210,7 +215,7 @@ pub mod impl_scroll {
 
             let feature = if buf_len > 7 {
                 Some(src.gread_with(offset, endian)?)
-            }else {
+            } else {
                 None
             };
 
@@ -250,7 +255,7 @@ pub mod impl_scroll {
 
             let feature_length = match self.feature {
                 Some(feature) => this.gwrite_with::<Feature>(feature, offset, ctx)?,
-                None => 0
+                None => 0,
             };
 
             // 7 bytes + feature_length bytes = buf.length
@@ -311,9 +316,9 @@ pub mod impl_scroll {
                 frame_type: Type::Data,
                 buffer_id: BufferID::CDNonAck,
                 sequence_id: 103,
-                feature: command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(
+                feature: Some(command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(
                     pilot_state,
-                ))),
+                )))),
             };
 
             let actual_frame: Frame = message.pread_with(0, LE).unwrap();
@@ -338,12 +343,13 @@ mod frame_tests {
     use crate::common::{self, Class as CommonClass};
     use crate::jumping_sumo::*;
     use chrono::{TimeZone, Utc};
+    use scroll::{LE, Pread, Pwrite};
 
     use std::convert::TryInto;
 
     #[test]
     fn test_common_date_command() {
-        let expected_message = "0x4 0xb 0x1 0x15 0x0 0x0 0x0 0x4 0x1 0x0 0x32 0x30 0x32 0x30 0x2d 0x30 0x34 0x2d 0x32 0x36 0x0";
+        let expected_message = [0x4, 0xb, 0x1, 0x15, 0x0, 0x0, 0x0, 0x4, 0x1, 0x0, 0x32, 0x30, 0x32, 0x30, 0x2d, 0x30, 0x34, 0x2d, 0x32, 0x36, 0x0];
 
         let date = Utc.ymd(2020, 04, 26).and_hms(15, 06, 11);
 
@@ -351,17 +357,17 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 1,
-            feature: command::Feature::Common(CommonClass::Common(common::Common::CurrentDate(
+            feature: Some(command::Feature::Common(CommonClass::Common(common::Common::CurrentDate(
                 date,
-            ))),
+            )))),
         };
 
-        assert_frames_match(expected_message, frame);
+        assert_frames_match(&expected_message, frame);
     }
 
     #[test]
     fn test_common_time_command() {
-        let expected_message = "0x4 0xb 0x2 0x15 0x0 0x0 0x0 0x4 0x2 0x0 0x54 0x31 0x35 0x30 0x36 0x31 0x31 0x30 0x30 0x30 0x0";
+        let expected_message = [0x4, 0xb, 0x2, 0x15, 0x0, 0x0, 0x0, 0x4, 0x2, 0x0, 0x54, 0x31, 0x35, 0x30, 0x36, 0x31, 0x31, 0x30, 0x30, 0x30, 0x0];
 
         let date = Utc.ymd(2020, 04, 26).and_hms(15, 06, 11);
 
@@ -369,17 +375,17 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 2,
-            feature: command::Feature::Common(CommonClass::Common(common::Common::CurrentTime(
+            feature: Some(command::Feature::Common(CommonClass::Common(common::Common::CurrentTime(
                 date,
-            ))),
+            )))),
         };
 
-        assert_frames_match(expected_message, frame);
+        assert_frames_match(&expected_message, frame);
     }
 
     #[test]
     fn test_jumpingsumo_move_command() {
-        let expected_message = "0x2 0xa 0x67 0xe 0x0 0x0 0x0 0x3 0x0 0x0 0x0 0x1 0x0 0x9c";
+        let expected_message = [0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c];
 
         let pilot_state = PilotState {
             flag: true,
@@ -391,38 +397,36 @@ mod frame_tests {
             frame_type: Type::Data,
             buffer_id: BufferID::CDNonAck,
             sequence_id: 103,
-            feature: command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(pilot_state))),
+            feature: Some(command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(pilot_state)))),
         };
 
-        assert_frames_match(expected_message, frame);
+        assert_frames_match(&expected_message, frame);
     }
 
     #[test]
     fn test_jumpingsumo_jump_command() {
-        let expected_message = "0x4 0xb 0x1 0xf 0x0 0x0 0x0 0x3 0x2 0x3 0x0 0x0 0x0 0x0 0x0";
+        let expected_message = [0x4, 0xb, 0x1, 0xf, 0x0, 0x0, 0x0, 0x3, 0x2, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0];
 
         let frame = Frame {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 1,
-            feature: command::Feature::JumpingSumo(Class::Animations(Anim::Jump)),
+            feature: Some(command::Feature::JumpingSumo(Class::Animations(Anim::Jump))),
         };
 
-        assert_frames_match(expected_message, frame);
+        assert_frames_match(&expected_message, frame);
     }
 
+
+    fn assert_frames_match(expected: &[u8], frame: Frame) {
+        assert_eq!(expected.pread_with::<Frame>(0, LE).expect("Should deserialize"), frame);
+        let mut actual = vec![];
+
+        actual.pwrite_with::<Frame>(frame, 0, LE).expect("Should serialize");
+
+        assert_eq!(&expected, &actual.as_slice());
+    }
     // 0x2 0xb 0x1 0xf 0x0 0x0 0x0 0x3 0x2 0x3 0x0 0x0 0x0 0x0 0x0
-
-    fn assert_frames_match(output: &str, frame: Frame) {
-        let buf = frame.into_raw().0;
-
-        let actual_message = buf
-            .iter()
-            .map(|b| format!("0x{:x}", b))
-            .collect::<Vec<_>>()
-            .join(" ");
-        assert_eq!(output, actual_message);
-    }
 
     #[test]
     fn test_frame() {

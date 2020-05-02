@@ -190,7 +190,12 @@ pub mod scroll_impl {
                 20 => Self::MediaRecordEvent,
                 21 => Self::VideoSettings,
                 22 => Self::VideoSettingsState,
-                value => return Err(Self::Error::OutOfBound{ value: value.into(), param: "Class".to_string() }),
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "Class".to_string(),
+                    })
+                }
             };
 
             Ok((class, offset))
@@ -223,7 +228,12 @@ pub mod scroll_impl {
                 }
                 1 => Self::Posture,
                 2 => Self::AddCapOffset,
-                value => return Err(Self::Error::OutOfBound{ value: value.into(), param: "PilotingId".to_string() }),
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "PilotingId".to_string(),
+                    })
+                }
             };
 
             Ok((piloting_id, offset))
@@ -252,7 +262,12 @@ pub mod scroll_impl {
                 0 => false,
                 1 => true,
                 // @TODO: should we mention that it is for PilotState as well and how?
-                value => return Err(Self::Error::OutOfBound{ value: value.into(), param: "flag".to_string() }),
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "flag".to_string(),
+                    })
+                }
             };
             let speed: i8 = src.gread_with(&mut offset, endian)?;
             let turn: i8 = src.gread_with(&mut offset, endian)?;

@@ -34,7 +34,12 @@ impl Bebop2 {
 
         let feature = Feature::ArDrone3(ArDrone3::TakeOff);
 
-        let frame = Frame::for_drone(&self.drone, Type::DataWithAck, BufferID::CDAck, Some(feature));
+        let frame = Frame::for_drone(
+            &self.drone,
+            Type::DataWithAck,
+            BufferID::CDAck,
+            Some(feature),
+        );
 
         self.drone.send_frame(frame)
     }
