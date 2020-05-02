@@ -88,18 +88,18 @@ pub mod scroll_impl {
                     let common = src.gread_with(&mut offset, endian)?;
 
                     Self::Common(common)
-                },
+                }
                 1 => {
                     let ardrone3 = src.gread_with(&mut offset, endian)?;
 
                     Self::ArDrone3(ardrone3)
-                },
+                }
                 2 => Self::Minidrone,
                 3 => {
                     let js_class = src.gread_with(&mut offset, endian)?;
 
                     Self::JumpingSumo(js_class)
-                },
+                }
                 4 => Self::SkyController,
                 8 => Self::PowerUp,
                 133 => Self::Generic,
@@ -114,7 +114,7 @@ pub mod scroll_impl {
                 142 => Self::ThermalCam,
                 144 => Self::Animation,
                 147 => Self::SequoiaCam,
-                _ => return Err(scroll::Error::Custom("Out of range".into()))
+                _ => return Err(scroll::Error::Custom("Out of range".into())),
             };
 
             Ok((feature, offset))
@@ -127,7 +127,6 @@ pub mod scroll_impl {
         fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
             let ser_feature = self.serialize();
             let written = this.pwrite_with(ser_feature.as_slice(), 0, ())?;
-
 
             Ok(written)
         }

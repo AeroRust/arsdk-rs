@@ -211,12 +211,24 @@ pub mod impl_scroll {
             let feature = src.gread_with(offset, endian)?;
 
             if buf_len != *offset as u32 {
-                // type u8 buffer_id: u8 sequence_id: u8 buf_len: u32 feature
-                let error = format!("Expected {} got {} bytes of whole Frame", buf_len, *offset - 1);
+                let error = format!(
+                    "Expected {} bytes got {} bytes in Frame",
+                    buf_len,
+                    *offset - 1
+                );
+
                 return Err(scroll::Error::Custom(error));
             }
 
-            Ok((Frame { frame_type, buffer_id, sequence_id, feature }, *offset))
+            Ok((
+                Frame {
+                    frame_type,
+                    buffer_id,
+                    sequence_id,
+                    feature,
+                },
+                *offset,
+            ))
         }
     }
 
@@ -228,7 +240,7 @@ pub mod impl_scroll {
 
             this.gwrite_with::<u8>(self.frame_type.into(), offset, ctx)?;
             this.gwrite_with::<u8>(self.buffer_id.into(), offset, ctx)?;
-            this.gwrite_with::<u8>(self.sequence_id.into(), offset, ctx)?;
+            this.gwrite_with::<u8>(self.sequence_id, offset, ctx)?;
 
             let buf_length_offset = *offset;
             // reserve bytes for the buffer length (u32)
@@ -251,8 +263,8 @@ pub mod impl_scroll {
             let frame_value = src.gread::<u8>(offset)?;
 
             Type::try_from(frame_value)
-            .map(|frame_type| (frame_type, *offset))
-            .map_err(|err| scroll::Error::Custom(err.to_string()))
+                .map(|frame_type| (frame_type, *offset))
+                .map_err(|err| scroll::Error::Custom(err.to_string()))
         }
     }
 
@@ -265,8 +277,8 @@ pub mod impl_scroll {
             let id_value = src.gread::<u8>(offset)?;
 
             BufferID::try_from(id_value)
-            .map(|buffer_id| (buffer_id, *offset))
-            .map_err(|err| scroll::Error::Custom(err.to_string()))
+                .map(|buffer_id| (buffer_id, *offset))
+                .map_err(|err| scroll::Error::Custom(err.to_string()))
         }
     }
 
@@ -274,11 +286,13 @@ pub mod impl_scroll {
     mod test {
         use super::*;
         use crate::jumping_sumo::*;
-        use scroll::{LE, Pwrite};
+        use scroll::{Pwrite, LE};
 
         #[test]
         fn test_full_frame() {
-            let message: [u8; 14] = [0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c];
+            let message: [u8; 14] = [
+                0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c,
+            ];
 
             let pilot_state = PilotState {
                 flag: true,
@@ -290,7 +304,9 @@ pub mod impl_scroll {
                 frame_type: Type::Data,
                 buffer_id: BufferID::CDNonAck,
                 sequence_id: 103,
-                feature: command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(pilot_state))),
+                feature: command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(
+                    pilot_state,
+                ))),
             };
 
             let actual_frame: Frame = message.pread_with(0, LE).unwrap();
@@ -298,11 +314,12 @@ pub mod impl_scroll {
             assert_eq!(expected_frame, actual_frame);
 
             let mut actual_message: [u8; 14] = [0; 14];
-            actual_message.pwrite_with(actual_frame, 0, LE).expect("whoopsy");
+            actual_message
+                .pwrite_with(actual_frame, 0, LE)
+                .expect("whoopsy");
 
             assert_eq!(message, actual_message)
         }
-
     }
 }
 
