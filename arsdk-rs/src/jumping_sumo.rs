@@ -56,48 +56,6 @@ pub struct PilotState {
     pub turn: i8,
 }
 
-impl Data for Class {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match &self {
-            Class::Piloting(piloting_id) => {
-                buf.extend(piloting_id.serialize());
-            }
-            Class::Animations(animation) => {
-                buf.push(animation.clone().into());
-                // TODO: FIX THIS
-                buf.extend(vec![0, 0, 0, 0, 0]);
-            }
-            _ => {}
-        }
-
-        buf
-    }
-}
-
-impl Data for PilotingID {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(2);
-        let piloting_u16: u16 = self.clone().into();
-        buf.push((piloting_u16 >> 8) as u8);
-        buf.push(piloting_u16 as u8);
-        match self {
-            PilotingID::Pilot(pilot_state) => {
-                buf.extend(pilot_state.serialize());
-            }
-            _ => {}
-        }
-        buf
-    }
-}
-
-impl Data for PilotState {
-    fn serialize(&self) -> Vec<u8> {
-        vec![self.flag as u8, self.speed as u8, self.turn as u8]
-    }
-}
-
 // --------------------- Conversion impls --------------------- //
 
 impl Into<u8> for Class {
@@ -162,7 +120,7 @@ pub mod scroll_impl {
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+            let class = match src.gread_with::<u16>(&mut offset, endian)? {
                 0 => {
                     let pilot_state = src.gread_with(&mut offset, endian)?;
 
@@ -208,9 +166,10 @@ pub mod scroll_impl {
     impl<'a> ctx::TryIntoCtx<Endian> for Class {
         type Error = scroll::Error;
 
-        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
-            let ser_class = self.serialize();
-            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+
+            let written = this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
 
             Ok(written)
         }
@@ -246,11 +205,18 @@ pub mod scroll_impl {
     impl<'a> ctx::TryIntoCtx<Endian> for PilotingID {
         type Error = MessageError;
 
-        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
-            let ser_class = self.serialize();
-            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+            this.gwrite_with::<u16>(self.into(), &mut offset, ctx)?;
 
-            Ok(written)
+            match self {
+                Self::Pilot(state) => {
+                    this.gwrite_with(state, &mut offset, ctx)?;
+                },
+                _ => {}
+            }
+
+            Ok(offset + 1)
         }
     }
 
@@ -284,11 +250,13 @@ pub mod scroll_impl {
     impl<'a> ctx::TryIntoCtx<Endian> for PilotState {
         type Error = MessageError;
 
-        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
-            let ser_class = self.serialize();
-            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+            this.gwrite_with::<u8>(self.flag.into(), &mut offset, ctx)?;
+            this.gwrite_with(self.speed, &mut offset, ctx)?;
+            this.gwrite_with(self.turn, &mut offset, ctx)?;
 
-            Ok(written)
+            Ok(offset + 1)
         }
     }
 
@@ -303,15 +271,17 @@ pub mod scroll_impl {
                 0 => Self::JumpStop,
                 1 => Self::JumpCancel,
                 2 => Self::JumpLoad,
-                2 => Self::Jump,
+                3 => Self::Jump,
                 4 => Self::SimpleAnimation,
                 value => {
                     return Err(Self::Error::OutOfBound {
                         value: value.into(),
-                        param: "Class".to_string(),
+                        param: "Anim".to_string(),
                     })
                 }
             };
+
+
 
             Ok((class, offset))
         }
@@ -321,13 +291,13 @@ pub mod scroll_impl {
         type Error = scroll::Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
-            let offset = &mut 0;
-            let mut written = this.gwrite_with::<u8>(self.into(), offset, ctx)?;
+            let mut offset: usize = 0;
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
             // TODO: FIX THIS!
-            let dummy_anim = [0_u8, 0, 0, 0, 0];
-            written += this.gwrite_with(dummy_anim.as_ref(), offset, ())?;
+            let dummy_anim = [1_u8; 5];
+            this.gwrite_with(dummy_anim.as_ref(), &mut offset, ())?;
 
-            Ok(written)
+            Ok(offset)
         }
     }
 }

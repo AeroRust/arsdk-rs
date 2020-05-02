@@ -2,8 +2,8 @@ use crate::ardrone3::ArDrone3;
 use crate::common;
 use crate::frame::Data;
 use crate::jumping_sumo;
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     ArDrone3(ArDrone3),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
@@ -52,26 +52,6 @@ impl Into<u8> for Feature {
     }
 }
 
-impl Data for Feature {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match &self {
-            Feature::JumpingSumo(js) => {
-                buf.extend(js.serialize());
-            }
-            Feature::Common(common) => {
-                buf.extend(common.serialize());
-            }
-            Feature::ArDrone3(drone) => {
-                buf.extend(drone.serialize());
-            }
-            _ => {}
-        }
-        buf
-    }
-}
-
 pub mod scroll_impl {
     use super::*;
     use crate::MessageError;
@@ -99,7 +79,7 @@ pub mod scroll_impl {
                 3 => {
                     let js_class = src.gread_with(&mut offset, endian)?;
 
-                    Self::JumpingSumo(js_class)
+                    Feature::JumpingSumo(js_class)
                 }
                 4 => Self::SkyController,
                 8 => Self::PowerUp,
@@ -130,11 +110,15 @@ pub mod scroll_impl {
     impl<'a> ctx::TryIntoCtx<Endian> for Feature {
         type Error = scroll::Error;
 
-        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
-            let ser_feature = self.serialize();
-            let written = this.pwrite_with(ser_feature.as_slice(), 0, ())?;
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
 
-            Ok(written)
+            // @TODO: FIX THIS!
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            let ser_feature: [u8; 5] = [1_u8; 5];
+
+            let written = this.gwrite_with(ser_feature.as_ref(), &mut offset, ())?;
+            Ok(dbg!(written))
         }
     }
 }
