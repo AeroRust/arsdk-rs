@@ -69,11 +69,10 @@ pub mod scroll_impl {
                 11 => CancelMoveTo,
                 12 => StartPilotedPOI,
                 13 => StopPilotedPOI,
-                _ => return Err(scroll::Error::Custom("Out of range".into()))
+                _ => return Err(scroll::Error::Custom("Out of range".into())),
             };
 
             Ok((ardrone3, *offset))
         }
-
     }
 }
