@@ -169,8 +169,11 @@ pub mod scroll_impl {
                     Self::Piloting(pilot_state)
                 }
                 1 => Self::PilotingState,
-                // TODO: Impl animcation `TryFromCtx`
-                2 => Self::Animations(Anim::Jump),
+                2 => {
+                    let anim = src.gread_with(&mut offset, endian)?;
+
+                    Self::Animations(anim)
+                },
                 3 => Self::AnimationsState,
                 5 => Self::SettingsState,
                 6 => Self::MediaRecord,
@@ -284,6 +287,45 @@ pub mod scroll_impl {
         fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
             let ser_class = self.serialize();
             let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+
+            Ok(written)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Anim {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => Self::JumpStop,
+                1 => Self::JumpCancel,
+                2 => Self::JumpLoad,
+                2 => Self::Jump,
+                4 => Self::SimpleAnimation,
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "Class".to_string(),
+                    })
+                }
+            };
+
+            Ok((class, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Anim {
+        type Error = scroll::Error;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let offset = &mut 0;
+            let mut written = this.gwrite_with::<u8>(self.into(), offset, ctx)?;
+            // TODO: FIX THIS!
+            let dummy_anim = [0_u8, 0, 0, 0, 0];
+            written += this.gwrite_with(dummy_anim.as_ref(), offset, ())?;
 
             Ok(written)
         }

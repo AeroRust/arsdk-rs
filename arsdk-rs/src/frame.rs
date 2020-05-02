@@ -420,11 +420,11 @@ mod frame_tests {
 
     fn assert_frames_match(expected: &[u8], frame: Frame) {
         assert_eq!(expected.pread_with::<Frame>(0, LE).expect("Should deserialize"), frame);
-        let mut actual = vec![];
+        let mut actual = [0_u8; 4086];
 
-        actual.pwrite_with::<Frame>(frame, 0, LE).expect("Should serialize");
+        let actual_written = actual.pwrite_with::<Frame>(frame, 0, LE).expect("Should serialize");
 
-        assert_eq!(&expected, &actual.as_slice());
+        assert_eq!(expected, &actual[..actual_written]);
     }
     // 0x2 0xb 0x1 0xf 0x0 0x0 0x0 0x3 0x2 0x3 0x0 0x0 0x0 0x0 0x0
 
