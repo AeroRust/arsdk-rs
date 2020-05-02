@@ -152,10 +152,11 @@ impl Into<u16> for PilotingID {
 }
 pub mod scroll_impl {
     use super::*;
+    use crate::MessageError;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -189,7 +190,7 @@ pub mod scroll_impl {
                 20 => Self::MediaRecordEvent,
                 21 => Self::VideoSettings,
                 22 => Self::VideoSettingsState,
-                _ => return Err(scroll::Error::Custom("Out of range".into())),
+                value => return Err(Self::Error::OutOfBound{ value: value.into(), param: "Class".to_string() }),
             };
 
             Ok((class, offset))
@@ -208,7 +209,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for PilotingID {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -222,7 +223,7 @@ pub mod scroll_impl {
                 }
                 1 => Self::Posture,
                 2 => Self::AddCapOffset,
-                _ => return Err(scroll::Error::Custom("Out of range".into())),
+                value => return Err(Self::Error::OutOfBound{ value: value.into(), param: "PilotingId".to_string() }),
             };
 
             Ok((piloting_id, offset))
@@ -230,7 +231,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for PilotingID {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
             let ser_class = self.serialize();
@@ -241,7 +242,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for PilotState {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -250,11 +251,8 @@ pub mod scroll_impl {
             let flag = match src.gread_with::<u8>(&mut offset, endian)? {
                 0 => false,
                 1 => true,
-                _ => {
-                    return Err(scroll::Error::Custom(
-                        "`flag` is out of range it can only be true or false".into(),
-                    ))
-                }
+                // @TODO: should we mention that it is for PilotState as well and how?
+                value => return Err(Self::Error::OutOfBound{ value: value.into(), param: "flag".to_string() }),
             };
             let speed: i8 = src.gread_with(&mut offset, endian)?;
             let turn: i8 = src.gread_with(&mut offset, endian)?;
@@ -266,7 +264,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for PilotState {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
             let ser_class = self.serialize();

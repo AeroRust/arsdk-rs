@@ -1,11 +1,6 @@
 use crate::{command, Drone};
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
-use std::convert::TryFrom;
-
-pub trait IntoRawFrame {
-    fn into_raw(self) -> RawFrame;
-}
-pub struct RawFrame(pub Vec<u8>);
+use std::{convert::TryFrom};
 
 pub trait Data {
     fn serialize(&self) -> Vec<u8>;
@@ -16,7 +11,7 @@ pub struct Frame {
     frame_type: Type,
     buffer_id: BufferID,
     sequence_id: u8,
-    feature: command::Feature,
+    feature: Option<command::Feature>,
 }
 
 impl Frame {
@@ -24,7 +19,7 @@ impl Frame {
         frame_type: Type,
         buffer_id: BufferID,
         sequence_id: u8,
-        feature: command::Feature,
+        feature: Option<command::Feature>,
     ) -> Self {
         Self {
             frame_type,
@@ -38,29 +33,32 @@ impl Frame {
         drone: &Drone,
         frame_type: Type,
         buffer_id: BufferID,
-        feature: command::Feature,
+        feature: Option<command::Feature>,
     ) -> Frame {
-        Frame::new(frame_type, buffer_id, drone.sequence_id(buffer_id), feature)
+        Frame::new(frame_type, buffer_id, drone.inner.sequence_id(buffer_id), feature)
     }
 }
 
-impl IntoRawFrame for Frame {
-    fn into_raw(self) -> RawFrame {
-        let ser_feature = self.feature.serialize();
-        // Frame size 3 bytes + 4 bytes (u32) + ser_feature.len()
-        let buf_len = 7 + ser_feature.len();
+// impl IntoRawMessage for Frame {
+//     fn into_raw(self) -> RawMessage {
+//         let ser_feature = self.feature.map(|f| f.serialize());
+//         // Frame size 3 bytes + 4 bytes (u32) + ser_feature.len()
+//         let buf_len = 7 + ser_feature.as_ref().map(|f| f.len()).unwrap_or_default();
 
-        let mut buf = Vec::with_capacity(buf_len);
-        buf.push(self.frame_type.into());
-        buf.push(self.buffer_id.into());
-        buf.push(self.sequence_id);
-        // buffer size as u32 (4 bytes)
-        buf.extend(&(buf_len as u32).to_le_bytes());
-        buf.extend(ser_feature);
+//         let mut buf = Vec::with_capacity(buf_len);
+//         buf.push(self.frame_type.into());
+//         buf.push(self.buffer_id.into());
+//         buf.push(self.sequence_id);
+//         // buffer size as u32 (4 bytes)
+//         buf.extend(&(buf_len as u32).to_le_bytes());
 
-        RawFrame(buf)
-    }
-}
+//         if let Some(feature) = ser_feature {
+//             buf.extend(feature);
+//         }
+
+//         RawMessage(buf)
+//     }
+// }
 
 // --------------------- Types --------------------- //
 
@@ -126,6 +124,7 @@ pub enum BufferID {
     // @TODO: Find the corresponding C definition if there is one and name the new enum variant!
     // PyParrot:
     // `'ACK_FROM_SEND_WITH_ACK': 139  # 128 + buffer id for 'SEND_WITH_ACK' is 139`
+    // ACKFromSendWithAck = 139,
 }
 
 // --------------------- Conversion impls --------------------- //
@@ -193,12 +192,12 @@ impl Into<u8> for BufferID {
 
 pub mod impl_scroll {
     use super::*;
-    use crate::command::Feature;
+    use crate::{MessageError, command::Feature};
 
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Frame {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -208,16 +207,19 @@ pub mod impl_scroll {
             let buffer_id = src.gread_with(offset, endian)?;
             let sequence_id = src.gread_with(offset, endian)?;
             let buf_len: u32 = src.gread_with(offset, endian)?;
-            let feature = src.gread_with(offset, endian)?;
 
+            let feature = if buf_len > 7 {
+                Some(src.gread_with(offset, endian)?)
+            }else {
+                None
+            };
+
+            // @TODO: offset as u32 can fail (TryFrom is impled for usize)
             if buf_len != *offset as u32 {
-                let error = format!(
-                    "Expected {} bytes got {} bytes in Frame",
-                    buf_len,
-                    *offset - 1
-                );
-
-                return Err(scroll::Error::Custom(error));
+                return Err(Self::Error::BytesLength {
+                    expected: buf_len,
+                    actual: *offset as u32,
+                });
             }
 
             Ok((
@@ -245,7 +247,12 @@ pub mod impl_scroll {
             let buf_length_offset = *offset;
             // reserve bytes for the buffer length (u32)
             this.gwrite_with::<u32>(0, offset, ctx)?;
-            let feature_length = this.gwrite_with::<Feature>(self.feature, offset, ctx)?;
+
+            let feature_length = match self.feature {
+                Some(feature) => this.gwrite_with::<Feature>(feature, offset, ctx)?,
+                None => 0
+            };
+
             // 7 bytes + feature_length bytes = buf.length
             let written = 7 + feature_length;
             this.pwrite_with::<u32>(written as u32, buf_length_offset, ctx)?;
