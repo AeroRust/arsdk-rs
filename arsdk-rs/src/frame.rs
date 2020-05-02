@@ -194,11 +194,12 @@ impl Into<u8> for BufferID {
 pub mod impl_scroll {
     use super::*;
     use crate::command::Feature;
+    use crate::MessageError;
 
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Frame {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -209,15 +210,12 @@ pub mod impl_scroll {
             let sequence_id = src.gread_with(offset, endian)?;
             let buf_len: u32 = src.gread_with(offset, endian)?;
             let feature = src.gread_with(offset, endian)?;
-
+            // @TODO: offset as u32 can fail (TryFrom is impled for usize)
             if buf_len != *offset as u32 {
-                let error = format!(
-                    "Expected {} bytes got {} bytes in Frame",
-                    buf_len,
-                    *offset - 1
-                );
-
-                return Err(scroll::Error::Custom(error));
+                return Err(Self::Error::BytesLength {
+                    expected: buf_len,
+                    actual: *offset as u32,
+                });
             }
 
             Ok((

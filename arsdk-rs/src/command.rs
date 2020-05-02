@@ -74,10 +74,11 @@ impl Data for Feature {
 
 pub mod scroll_impl {
     use super::*;
+    use crate::MessageError;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Feature {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -114,7 +115,12 @@ pub mod scroll_impl {
                 142 => Self::ThermalCam,
                 144 => Self::Animation,
                 147 => Self::SequoiaCam,
-                _ => return Err(scroll::Error::Custom("Out of range".into())),
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "Feature".to_string(),
+                    })
+                }
             };
 
             Ok((feature, offset))

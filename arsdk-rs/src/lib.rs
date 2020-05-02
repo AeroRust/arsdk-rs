@@ -32,18 +32,24 @@ pub mod prelude {
 pub enum MessageError {
     #[error("Message parsing error")]
     Scroll(#[from] scroll::Error),
-    #[error("Out of bound value {value}")]
-    Invalid {
+    #[error("Out of bound value {value} for {param}")]
+    OutOfBound {
         // TODO: See how should we handle this for each individual case
         // Use the largest possible value
         value: u64,
+        param: String,
     },
+    #[error("Expected {expected} bytes, got {actual}")]
+    BytesLength {
+        expected: u32,
+        actual: u32,
+    }
 }
 
 #[derive(Debug)]
 pub struct Config {
     pub drone_addr: IpAddr,
-    /// Wheather or not it should send:
+    /// Wheather or not to set after connecting (by sending a frame) the current DateTime to the Drone:
     ///
     /// ```rust
     /// let now: DateTime<Utc> = Utc::now()
@@ -150,11 +156,11 @@ fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
         let mut buf = [0; 256];
         if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
             println!("Read {} bytes from {} ", bytes_read, origin.ip());
-            let octal: Vec<String> = buf[0..bytes_read]
+            let hex: Vec<String> = buf[0..bytes_read]
                 .iter()
-                .map(|byte| format!("{:#o}", byte))
+                .map(|byte| format!("{:#x}", byte))
                 .collect();
-            println!("{}", octal.join(" "));
+            println!("{}", hex.join(" "));
         }
     });
 
@@ -163,7 +169,7 @@ fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
 
 fn print_message(buf: &[u8]) {
     for b in buf.iter() {
-        print!("{:#o}", b);
+        print!("{:#x}", b);
     }
     println!();
 }
