@@ -1,7 +1,6 @@
-use crate::frame::Data;
 use chrono::{offset::Utc, DateTime};
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Class {
     Network,                 // ARCOMMANDS_ID_COMMON_CLASS_NETWORK = 0,
     NetworkEvent,            // ARCOMMANDS_ID_COMMON_CLASS_NETWORKEVENT = 1,
@@ -39,46 +38,12 @@ pub enum Class {
     Factory,                 // ARCOMMANDS_ID_COMMON_CLASS_FACTORY = 31,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Common {
     AllStates,                  // ARCOMMANDS_ID_COMMON_COMMON_CMD_ALLSTATES = 0,
     CurrentDate(DateTime<Utc>), // ARCOMMANDS_ID_COMMON_COMMON_CMD_CURRENTDATE = 1,
     CurrentTime(DateTime<Utc>), // ARCOMMANDS_ID_COMMON_COMMON_CMD_CURRENTTIME = 2,
     Reboot,                     // ARCOMMANDS_ID_COMMON_COMMON_CMD_REBOOT = 3,
-}
-
-impl Data for Class {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match self {
-            Self::Common(common_command) => {
-                buf.extend(common_command.serialize());
-            }
-            _ => {}
-        }
-        buf
-    }
-}
-
-impl Data for Common {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match self {
-            Self::CurrentDate(date) => {
-                buf.extend(format_date(date));
-                // null terminated C string
-                buf.push(0);
-            }
-            Self::CurrentTime(time) => {
-                buf.extend(format_time(time)); // null terminated C string
-                buf.push(0);
-            }
-            _ => {}
-        }
-        buf
-    }
 }
 
 // "yyyy-MM-dd"forCommon.Common.CurrentDate.  Ex:2015-08-27
@@ -144,6 +109,141 @@ impl Into<u8> for Common {
     }
 }
 
+pub mod scroll_impl {
+    use super::*;
+    use crate::MessageError;
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => Self::Network,
+                1 => Self::NetworkEvent,
+                2 => Self::Settings,
+                3 => Self::SettingsState,
+                4 => {
+                    let common = src.gread_with(&mut offset, endian)?;
+
+                    Self::Common(common)
+                }
+                5 => Self::CommonState,
+                6 => Self::Overheat,
+                7 => Self::OverheatState,
+                8 => Self::Controller,
+                9 => Self::WifiSettings,
+                10 => Self::WifiSettingsState,
+                11 => Self::Mavlink,
+                12 => Self::MavlinkState,
+                13 => Self::Calibration,
+                14 => Self::CalibrationState,
+                15 => Self::CameraSettingsState,
+                16 => Self::Gps,
+                17 => Self::FlightPlanState,
+                18 => Self::ArLibsVersionsState,
+                19 => Self::FlightPlanEvent,
+                20 => Self::Audio,
+                21 => Self::AudioState,
+                22 => Self::HeadLights,
+                23 => Self::HeadLightsState,
+                24 => Self::Animations,
+                25 => Self::AnimationsState,
+                26 => Self::Accessory,
+                27 => Self::AccessoryState,
+                28 => Self::Charger,
+                29 => Self::ChargerState,
+                30 => Self::Runstate,
+                31 => Self::Factory,
+                32 => Self::FlightPlanSettings,
+                33 => Self::FlightPlanSettingsState,
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "Class".to_string(),
+                    })
+                }
+            };
+
+            Ok((class, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Common {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+
+            match self {
+                Self::CurrentDate(date) => {
+                    let mut date = format_date(&date);
+                    // null terminated C string
+                    date.push(0);
+                    this.gwrite_with::<&[u8]>(date.as_ref(), &mut offset, ())?;
+                }
+                Self::CurrentTime(time) => {
+                    // null terminated C string
+                    let mut time = format_time(&time);
+                    time.push(0);
+                    this.gwrite_with::<&[u8]>(time.as_ref(), &mut offset, ())?;
+                }
+                _ => unimplemented!("Not all Common are impled"),
+            }
+
+            Ok(offset)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Common {
+        type Error = MessageError;
+
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            use Common::*;
+            let mut offset = 0;
+
+            let common = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => AllStates,
+                // @TODO: FIX THIS!
+                1 => CurrentDate(Utc::now()),
+                // @TODO: FIX THIS!
+                2 => CurrentTime(Utc::now()),
+                3 => Reboot,
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "Common".to_string(),
+                    })
+                }
+            };
+
+            Ok((common, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Class {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+
+            match self {
+                Self::Common(common) => {
+                    this.gwrite_with(common, &mut offset, ctx)?;
+                }
+                _ => unimplemented!("Not all Class are impled"),
+            };
+
+            Ok(offset)
+        }
+    }
+}
 // --------------------- Tests --------------------- //
 
 #[cfg(test)]

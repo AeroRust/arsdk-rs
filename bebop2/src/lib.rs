@@ -22,6 +22,9 @@ impl Bebop2 {
         Ok(Self { drone })
     }
 
+    // ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_NAVIGATEHOME
+    // ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_AUTOTAKEOFFMODE
+
     pub fn take_off(&self) -> AnyResult<()> {
         // Ardrone3
         // ARCOMMANDS_ID_ARDRONE3_CLASS_PILOTING
@@ -31,7 +34,12 @@ impl Bebop2 {
 
         let feature = Feature::ArDrone3(ArDrone3::TakeOff);
 
-        let frame = Frame::for_drone(&self.drone, Type::DataWithAck, BufferID::CDAck, feature);
+        let frame = Frame::for_drone(
+            &self.drone,
+            Type::DataWithAck,
+            BufferID::CDAck,
+            Some(feature),
+        );
 
         self.drone.send_frame(frame)
     }

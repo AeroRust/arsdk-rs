@@ -1,7 +1,4 @@
-use crate::frame::Data;
-
 /// eARCOMMANDS_ID_ARDRONE3_PILOTING_CMD
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ArDrone3 {
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_FLATTRIM = 0
@@ -29,17 +26,58 @@ pub enum ArDrone3 {
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_CANCELMOVETO = 11
     CancelMoveTo = 11,
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_STARTPILOTEDPOI = 12
-    StartPilotdPOI = 12,
+    StartPilotedPOI = 12,
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_STOPPILOTEDPOI = 13
     StopPilotedPOI = 13,
 }
 
-impl Data for ArDrone3 {
-    fn serialize(&self) -> Vec<u8> {
-        // todo: Fix this hardcoded value
+pub mod scroll_impl {
+    use super::*;
+    use crate::MessageError;
+    use scroll::{ctx, Endian, Pread, Pwrite};
 
-        let take_off: u16 = 1;
+    impl<'a> ctx::TryFromCtx<'a, Endian> for ArDrone3 {
+        type Error = MessageError;
 
-        take_off.to_le_bytes().to_vec()
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            use ArDrone3::*;
+
+            let offset = &mut 0;
+
+            let ardrone3 = match src.gread_with::<u16>(offset, endian)? {
+                0 => FlatTrim,
+                1 => TakeOff,
+                2 => PCMD,
+                3 => Landing,
+                4 => Emergency,
+                5 => NavigateHome,
+                6 => AutoTakeOffMode,
+                7 => MoveBy,
+                8 => UserTakeOff,
+                9 => Circle,
+                10 => MoveTo,
+                11 => CancelMoveTo,
+                12 => StartPilotedPOI,
+                13 => StopPilotedPOI,
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "ArDrone3".to_string(),
+                    })
+                }
+            };
+
+            Ok((ardrone3, *offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for ArDrone3 {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            // TODO: Fix when we have more options
+            Ok(this.pwrite_with::<u16>(self as u16, 0, ctx)?)
+        }
     }
 }

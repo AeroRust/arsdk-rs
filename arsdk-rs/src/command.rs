@@ -1,9 +1,8 @@
 use crate::ardrone3::ArDrone3;
 use crate::common;
-use crate::frame::Data;
 use crate::jumping_sumo;
-#[derive(Debug, PartialEq, Clone, Copy)]
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     ArDrone3(ArDrone3),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
@@ -52,23 +51,83 @@ impl Into<u8> for Feature {
     }
 }
 
-impl Data for Feature {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match &self {
-            Feature::JumpingSumo(js) => {
-                buf.extend(js.serialize());
-            }
-            Feature::Common(common) => {
-                buf.extend(common.serialize());
-            }
-            Feature::ArDrone3(drone) => {
-                buf.extend(drone.serialize());
-            }
-            _ => {}
+pub mod scroll_impl {
+    use super::*;
+    use crate::MessageError;
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Feature {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+            let feature = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => {
+                    let common = src.gread_with(&mut offset, endian)?;
+
+                    Self::Common(common)
+                }
+                1 => {
+                    let ardrone3 = src.gread_with(&mut offset, endian)?;
+
+                    Self::ArDrone3(ardrone3)
+                }
+                2 => Self::Minidrone,
+                3 => {
+                    let js_class = src.gread_with(&mut offset, endian)?;
+
+                    Feature::JumpingSumo(js_class)
+                }
+                4 => Self::SkyController,
+                8 => Self::PowerUp,
+                133 => Self::Generic,
+                134 => Self::FollowMe,
+                135 => Self::Wifi,
+                136 => Self::RC,
+                137 => Self::DroneManager,
+                138 => Self::Mapper,
+                139 => Self::Debug,
+                140 => Self::ControllerInfo,
+                141 => Self::MapperMini,
+                142 => Self::ThermalCam,
+                144 => Self::Animation,
+                147 => Self::SequoiaCam,
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "Feature".to_string(),
+                    })
+                }
+            };
+
+            Ok((feature, offset))
         }
-        buf
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Feature {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+
+            match self {
+                Self::Common(common) => {
+                    this.gwrite_with(common, &mut offset, ctx)?;
+                }
+                Self::ArDrone3(ardrone3) => {
+                    this.gwrite_with(ardrone3, &mut offset, ctx)?;
+                }
+                Self::JumpingSumo(js) => {
+                    this.gwrite_with(js, &mut offset, ctx)?;
+                }
+                _ => unimplemented!("Not all Features are impled"),
+            }
+
+            Ok(offset)
+        }
     }
 }
 

@@ -1,9 +1,15 @@
+use crate::frame::Frame;
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use pnet::datalink;
+use scroll::Pread;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::{
+    mpsc::{sync_channel, Receiver, SyncSender},
+    Arc,
+};
+use thiserror::Error;
 
 pub const INIT_PORT: u16 = 44444;
 pub const LISTEN_PORT: u16 = 43210;
@@ -27,21 +33,43 @@ pub mod prelude {
     pub use crate::{Config, Drone, PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP};
 }
 
+#[derive(Debug, Error)]
+pub enum MessageError {
+    #[error("Message parsing error")]
+    Scroll(#[from] scroll::Error),
+    #[error("Out of bound value {value} for {param}")]
+    OutOfBound {
+        // TODO: See how should we handle this for each individual case
+        // Use the largest possible value
+        value: u64,
+        param: String,
+    },
+    #[error("Expected {expected} bytes, got {actual}")]
+    BytesLength { expected: u32, actual: u32 },
+}
+
 #[derive(Debug)]
 pub struct Config {
     pub drone_addr: IpAddr,
-    /// Wheather or not it should send:
+    /// Wheather or not to set after connecting (by sending a frame) the current DateTime to the Drone:
     ///
     /// ```rust
-    /// let now: DateTime<Utc> = Utc::now()
+    /// use chrono::{DateTime, Utc};
+    /// let now: DateTime<Utc> = Utc::now();
     /// ```
     pub send_datetime: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct Drone {
+    inner: Arc<DroneInner>,
+}
+
+#[derive(Debug)]
+struct DroneInner {
     // Each frame::BufferID gets its own sequence_id
     sequence_ids: DashMap<frame::BufferID, u8>,
-    sender: Sender<Vec<u8>>,
+    sender: SyncSender<Vec<u8>>,
 }
 
 impl Drone {
@@ -58,8 +86,18 @@ impl Drone {
             )
         })?;
 
+        // @TODO: Check if we're going to miss any messages between spawning the listener and the receiver of commands
+        let (tx_cmd, rx_cmd) = sync_channel(200);
+
+        let drone = Self {
+            inner: Arc::new(DroneInner {
+                sequence_ids: DashMap::new(),
+                sender: tx_cmd,
+            }),
+        };
+
         let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
-        spawn_listener(local_listener)?;
+        spawn_listener(drone.clone(), local_listener)?;
 
         let init_addr = SocketAddr::new(config.drone_addr, INIT_PORT);
         let handshake_response = perform_handshake(init_addr, local_listener.port())?;
@@ -67,12 +105,7 @@ impl Drone {
         let cmd_sender_target = SocketAddr::new(config.drone_addr, handshake_response.c2d_port);
 
         println!("spawning cmd sender on {}", cmd_sender_target);
-        let sender = spawn_cmd_sender(local_ip, cmd_sender_target)?;
-
-        let drone = Self {
-            sequence_ids: DashMap::new(),
-            sender,
-        };
+        spawn_cmd_sender(rx_cmd, local_ip, cmd_sender_target)?;
 
         if config.send_datetime {
             drone.send_datetime(Utc::now())?;
@@ -82,34 +115,50 @@ impl Drone {
     }
 
     pub fn send_frame(&self, frame: frame::Frame) -> AnyResult<()> {
-        self.send_raw_frame_unchecked(frame)
+        use scroll::{ctx::TryIntoCtx, LE};
+
+        let mut raw_message = [0_u8; 2048];
+        let written = frame.try_into_ctx(&mut raw_message, LE)?;
+
+        self.send_raw_message(&raw_message[0..written])
     }
 
-    pub fn send_raw_frame_unchecked(&self, frame: impl frame::IntoRawFrame) -> AnyResult<()> {
-        self.send(frame.into_raw().0)
-    }
-
-    fn send(&self, raw_frame: Vec<u8>) -> AnyResult<()> {
-        self.sender.send(raw_frame).map_err(AnyError::new)
+    pub fn send_raw_message(&self, raw_message: &[u8]) -> AnyResult<()> {
+        self.inner
+            .sender
+            .send(raw_message.to_vec())
+            .map_err(AnyError::new)
     }
 
     pub fn send_datetime(&self, date: DateTime<Utc>) -> AnyResult<()> {
         use command::Feature::Common;
         use common::Class;
-        use frame::{BufferID, Frame, Type};
+        use frame::{BufferID, Type};
 
         let date_feature = Common(Class::Common(common::Common::CurrentDate(date)));
 
-        let frame = Frame::for_drone(self, Type::DataWithAck, BufferID::CDAck, date_feature);
+        let frame = Frame::for_drone(
+            &self,
+            Type::DataWithAck,
+            BufferID::CDAck,
+            Some(date_feature),
+        );
 
         self.send_frame(frame)?;
 
         let time_feature = Common(Class::Common(common::Common::CurrentTime(date)));
-        let frame = Frame::for_drone(self, Type::DataWithAck, BufferID::CDAck, time_feature);
+        let frame = Frame::for_drone(
+            &self,
+            Type::DataWithAck,
+            BufferID::CDAck,
+            Some(time_feature),
+        );
 
         self.send_frame(frame)
     }
+}
 
+impl DroneInner {
     pub(crate) fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
         if let Some(mut sequence_id) = self.sequence_ids.get_mut(&buffer_id) {
             let command_id = *sequence_id;
@@ -131,42 +180,70 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
         .next()
 }
 
-fn spawn_listener(addr: impl ToSocketAddrs) -> AnyResult<()> {
+fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
     let listener = UdpSocket::bind(addr)?;
-    std::thread::spawn(move || loop {
-        let mut buf = [0; 256];
-        if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
-            println!("Read {} bytes from {} ", bytes_read, origin.ip());
-            let octal: Vec<String> = buf[0..bytes_read].iter().map(|byte| format!("{:#o}", byte)).collect();
-            println!("{}", octal.join(" "));
+    std::thread::spawn(move || {
+        let drone = drone.clone();
+        loop {
+            let mut buf = [0_u8; 256];
+            if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
+                if buf[1] == frame::BufferID::PING as u8 {
+                    println!(
+                        "Received: {} bytes from {} Bytes: {}",
+                        bytes_read,
+                        origin,
+                        print_buf(&buf[..bytes_read - 1])
+                    );
+
+                    let frame_type = frame::Type::Data;
+                    let buffer_id = frame::BufferID::PONG;
+
+                    let pong = frame::Frame::for_drone(&drone, frame_type, buffer_id, None);
+
+                    drone.send_frame(pong).expect("Should PONG successfully!");
+                }
+            }
         }
     });
 
     Ok(())
 }
 
-fn print_message(buf: &[u8]) {
-    for b in buf.iter() {
-        print!("{:#o}", b);
-    }
-    println!();
+fn print_buf(buf: &[u8]) -> String {
+    buf.iter()
+        .map(|byte| format!("{:#x}", byte))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
-fn spawn_cmd_sender(local_ip: IpAddr, target_addr: SocketAddr) -> AnyResult<Sender<Vec<u8>>> {
+fn spawn_cmd_sender(
+    rx: Receiver<Vec<u8>>,
+    local_ip: IpAddr,
+    target_addr: SocketAddr,
+) -> AnyResult<()> {
     let local_addr = SocketAddr::new(local_ip, target_addr.port());
 
     let socket = UdpSocket::bind(local_addr)
         .map_err(|e| anyhow!("Couldn't bind to local socket {} - {}", local_addr, e))?;
 
-    let (tx, rx) = channel::<Vec<u8>>();
     std::thread::spawn(move || loop {
         let frame_to_send = rx.recv().expect("couldn't receive frame.");
 
-        print_message(&frame_to_send);
+        use scroll::LE;
+        let frame = frame_to_send.pread_with::<Frame>(0, LE);
+
+        println!(
+            "Sent Frame (length: {}) => {:#?}",
+            frame_to_send.len(),
+            &frame
+        );
+
         let size = socket
             .send_to(&frame_to_send, target_addr)
             .expect("something terrible happened");
-        println!("sent {}", size);
+
+        assert_eq!(size, frame_to_send.len())
     });
-    Ok(tx)
+
+    Ok(())
 }

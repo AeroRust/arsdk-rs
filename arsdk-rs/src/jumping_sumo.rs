@@ -1,13 +1,11 @@
-use crate::frame::Data;
-
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum JumpType {
     LONG,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     HIGH,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     DEFAULT, // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Class {
     Piloting(PilotingID), // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     PilotingState,        // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTINGSTATE = 1,
@@ -33,7 +31,7 @@ pub enum Class {
     VideoSettingsState,   // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_VIDEOSETTINGSSTATE = 22,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Anim {
     JumpStop = 0,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPSTOP = 0,
     JumpCancel = 1,      // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPCANCEL = 1,
@@ -42,60 +40,18 @@ pub enum Anim {
     SimpleAnimation = 4, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PilotingID {
     Pilot(PilotState), // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_PCMD = 0,
     Posture,           // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_POSTURE = 1,
     AddCapOffset,      // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_ADDCAPOFFSET = 2,
 }
 
-#[derive(Default, Debug, PartialEq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct PilotState {
     pub flag: bool,
     pub speed: i8,
     pub turn: i8,
-}
-
-impl Data for Class {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match &self {
-            Class::Piloting(piloting_id) => {
-                buf.extend(piloting_id.serialize());
-            }
-            Class::Animations(animation) => {
-                buf.push(animation.clone().into());
-                // TODO: FIX THIS
-                buf.extend(vec![0, 0, 0, 0, 0]);
-            }
-            _ => {}
-        }
-
-        buf
-    }
-}
-
-impl Data for PilotingID {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(2);
-        let piloting_u16: u16 = self.clone().into();
-        buf.push((piloting_u16 >> 8) as u8);
-        buf.push(piloting_u16 as u8);
-        match self {
-            PilotingID::Pilot(pilot_state) => {
-                buf.extend(pilot_state.serialize());
-            }
-            _ => {}
-        }
-        buf
-    }
-}
-
-impl Data for PilotState {
-    fn serialize(&self) -> Vec<u8> {
-        vec![self.flag as u8, self.speed as u8, self.turn as u8]
-    }
 }
 
 // --------------------- Conversion impls --------------------- //
@@ -147,6 +103,209 @@ impl Into<u16> for PilotingID {
             Self::Pilot(_) => 0,
             Self::Posture => 1,
             Self::AddCapOffset => 2,
+        }
+    }
+}
+pub mod scroll_impl {
+    use super::*;
+    use crate::MessageError;
+    use scroll::{ctx, Endian, Pread, Pwrite};
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => {
+                    let pilot_state = src.gread_with(&mut offset, endian)?;
+
+                    Self::Piloting(pilot_state)
+                }
+                1 => Self::PilotingState,
+                2 => {
+                    let anim = src.gread_with(&mut offset, endian)?;
+
+                    Self::Animations(anim)
+                }
+                3 => Self::AnimationsState,
+                5 => Self::SettingsState,
+                6 => Self::MediaRecord,
+                7 => Self::MediaRecordState,
+                8 => Self::NetworkSettings,
+                9 => Self::NetworkSettingsState,
+                10 => Self::Network,
+                11 => Self::NetworkState,
+                12 => Self::AutioSettings,
+                13 => Self::AudioSettingsState,
+                14 => Self::Roadplan,
+                15 => Self::RoadplanState,
+                16 => Self::SpeedSettings,
+                17 => Self::SpeedSettingsState,
+                18 => Self::MediaStreaming,
+                19 => Self::MediaStreamingState,
+                20 => Self::MediaRecordEvent,
+                21 => Self::VideoSettings,
+                22 => Self::VideoSettingsState,
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "Class".to_string(),
+                    })
+                }
+            };
+
+            Ok((class, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Class {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            match self {
+                Self::Piloting(piloting_id) => {
+                    this.gwrite_with(piloting_id, &mut offset, ctx)?;
+                }
+                Self::Animations(anim) => {
+                    this.gwrite_with(anim, &mut offset, ctx)?;
+                }
+                _ => unimplemented!("Not all Class are impled"),
+            }
+
+            Ok(offset)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for PilotingID {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let piloting_id = match src.gread_with::<u16>(&mut offset, endian)? {
+                0 => {
+                    let pilot_state = src.gread_with(&mut offset, endian)?;
+
+                    Self::Pilot(pilot_state)
+                }
+                1 => Self::Posture,
+                2 => Self::AddCapOffset,
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "PilotingId".to_string(),
+                    })
+                }
+            };
+
+            Ok((piloting_id, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for PilotingID {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+            this.gwrite_with::<u16>(self.into(), &mut offset, ctx)?;
+
+            match self {
+                Self::Pilot(state) => {
+                    this.gwrite_with(state, &mut offset, ctx)?;
+                }
+                _ => unimplemented!("Not all PilotingID are impled"),
+            }
+
+            Ok(offset)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for PilotState {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let flag = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => false,
+                1 => true,
+                // @TODO: should we mention that it is for PilotState as well and how?
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "flag".to_string(),
+                    })
+                }
+            };
+            let speed: i8 = src.gread_with(&mut offset, endian)?;
+            let turn: i8 = src.gread_with(&mut offset, endian)?;
+
+            let pilot_state = PilotState { flag, speed, turn };
+
+            Ok((pilot_state, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for PilotState {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+            this.gwrite_with::<u8>(self.flag.into(), &mut offset, ctx)?;
+            this.gwrite_with(self.speed, &mut offset, ctx)?;
+            this.gwrite_with(self.turn, &mut offset, ctx)?;
+
+            Ok(offset)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Anim {
+        type Error = MessageError;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let anim = match src.gread_with::<u8>(&mut offset, endian)? {
+                0 => Self::JumpStop,
+                1 => Self::JumpCancel,
+                2 => Self::JumpLoad,
+                3 => Self::Jump,
+                4 => Self::SimpleAnimation,
+                value => {
+                    return Err(Self::Error::OutOfBound {
+                        value: value.into(),
+                        param: "Anim".to_string(),
+                    })
+                }
+            };
+
+            let mut anim_data = [0_u8; 5];
+            src.gread_inout_with(&mut offset, &mut anim_data, endian)?;
+
+            Ok((anim, offset))
+        }
+    }
+
+    impl<'a> ctx::TryIntoCtx<Endian> for Anim {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset: usize = 0;
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            // TODO: FIX THIS!
+            let dummy_anim = [0_u8; 5];
+            this.gwrite_with(dummy_anim.as_ref(), &mut offset, ())?;
+
+            Ok(offset)
         }
     }
 }

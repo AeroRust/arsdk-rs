@@ -46,10 +46,7 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
         arstream2_client_control_port: Some(44446),
     };
 
-    println!(
-        "connecting controller {}",
-        request.controller_name,
-    );
+    println!("connecting controller {}", request.controller_name,);
 
     let mut handshake_stream =
         retry(10, target).ok_or_else(|| anyhow!("Couldn't connect for handshake {}", target))?;
@@ -60,7 +57,7 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
 
     let mut response_string = String::new();
     handshake_stream.read_to_string(&mut response_string)?;
-    let response_string = response_string.trim_end_matches("\u{0}");
+    let response_string = response_string.trim_end_matches('\u{0}');
 
     let response: Response = serde_json::from_str(&response_string)?;
 
