@@ -269,11 +269,19 @@ pub mod impl_scroll {
         }
     }
 
+    impl<'a> ctx::TryIntoCtx<Endian> for Type {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            Ok(this.pwrite_with::<u8>(self.into(), 0, ctx)?)
+        }
+    }
+
     impl<'a> ctx::TryFromCtx<'a, Endian> for BufferID {
         type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], _ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
             let id_value = src.gread::<u8>(&mut offset)?;
 
@@ -299,6 +307,13 @@ pub mod impl_scroll {
         }
     }
 
+    impl<'a> ctx::TryIntoCtx<Endian> for BufferID {
+        type Error = MessageError;
+
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            Ok(this.pwrite_with::<u8>(self.into(), 0, ctx)?)
+        }
+    }
     #[cfg(test)]
     mod test {
         use super::*;
@@ -370,7 +385,7 @@ mod frame_tests {
             ))),
         };
 
-        // assert_frames_match(&expected_message, frame);
+        assert_frames_match(&expected_message, frame);
     }
 
     #[test]
@@ -391,7 +406,7 @@ mod frame_tests {
             ))),
         };
 
-        // assert_frames_match(&expected_message, frame);
+        assert_frames_match(&expected_message, frame);
     }
 
     #[test]

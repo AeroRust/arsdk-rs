@@ -111,8 +111,8 @@ impl Into<u8> for Common {
 
 pub mod scroll_impl {
     use super::*;
-    use scroll::{ctx, Endian, Pread, Pwrite};
     use crate::MessageError;
+    use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
         type Error = MessageError;
@@ -236,7 +236,7 @@ pub mod scroll_impl {
             match self {
                 Self::Common(common) => {
                     this.gwrite_with(common, &mut offset, ctx)?;
-                },
+                }
                 _ => unimplemented!(),
             };
 

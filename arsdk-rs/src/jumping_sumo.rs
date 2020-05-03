@@ -171,11 +171,11 @@ pub mod scroll_impl {
             match self {
                 Self::Piloting(piloting_id) => {
                     this.gwrite_with(piloting_id, &mut offset, ctx)?;
-                },
+                }
                 Self::Animations(anim) => {
                     this.gwrite_with(anim, &mut offset, ctx)?;
                 }
-                _ => {},
+                _ => {}
             }
 
             Ok(offset)
