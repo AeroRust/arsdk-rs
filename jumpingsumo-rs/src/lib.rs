@@ -68,7 +68,12 @@ impl JumpingSumo {
 
     pub fn drive(&self, state: PilotState) -> AnyResult<()> {
         let feature = JumpingSumoFeature(Piloting(Pilot(state)));
-        let frame = Frame::for_drone(&self.drone, FrameType::Data, BufferID::CDNonAck, Some(feature));
+        let frame = Frame::for_drone(
+            &self.drone,
+            FrameType::Data,
+            BufferID::CDNonAck,
+            Some(feature),
+        );
 
         self.drone.send_frame(frame)
     }

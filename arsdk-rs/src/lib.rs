@@ -54,7 +54,8 @@ pub struct Config {
     /// Wheather or not to set after connecting (by sending a frame) the current DateTime to the Drone:
     ///
     /// ```rust
-    /// let now: DateTime<Utc> = Utc::now()
+    /// use chrono::{DateTime, Utc};
+    /// let now: DateTime<Utc> = Utc::now();
     /// ```
     pub send_datetime: bool,
 }
@@ -91,7 +92,7 @@ impl Drone {
         let drone = Self {
             inner: Arc::new(DroneInner {
                 sequence_ids: DashMap::new(),
-                sender: tx_cmd.clone(),
+                sender: tx_cmd,
             }),
         };
 
@@ -178,11 +179,6 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
         .map(|ip_network| ip_network.ip())
         .next()
 }
-
-// TODO: We need a RawFrame(Vec<u8>) to be able to separate messages to parse
-// fn read_messages(buf: &[u8]) -> Vec<Vec<u8>> {
-//     buf.pread::<u32>()
-// }
 
 fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
     let listener = UdpSocket::bind(addr)?;

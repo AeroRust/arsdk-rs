@@ -2,10 +2,6 @@ use crate::{command, Drone};
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use std::convert::TryFrom;
 
-pub trait Data {
-    fn serialize(&self) -> Vec<u8>;
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
     frame_type: Type,
@@ -43,27 +39,6 @@ impl Frame {
         )
     }
 }
-
-// impl IntoRawMessage for Frame {
-//     fn into_raw(self) -> RawMessage {
-//         let ser_feature = self.feature.map(|f| f.serialize());
-//         // Frame size 3 bytes + 4 bytes (u32) + ser_feature.len()
-//         let buf_len = 7 + ser_feature.as_ref().map(|f| f.len()).unwrap_or_default();
-
-//         let mut buf = Vec::with_capacity(buf_len);
-//         buf.push(self.frame_type.into());
-//         buf.push(self.buffer_id.into());
-//         buf.push(self.sequence_id);
-//         // buffer size as u32 (4 bytes)
-//         buf.extend(&(buf_len as u32).to_le_bytes());
-
-//         if let Some(feature) = ser_feature {
-//             buf.extend(feature);
-//         }
-
-//         RawMessage(buf)
-//     }
-// }
 
 // --------------------- Types --------------------- //
 
@@ -214,19 +189,11 @@ pub mod impl_scroll {
             let buf_len: u32 = src.gread_with(&mut offset, endian)?;
 
             let feature = if buf_len > 7 {
-                let mut feature_len = 0;
-                let srcc = src[7..].to_vec();
-                let feature = srcc.gread_with::<Feature>(&mut feature_len, endian)?;
-                dbg!(&offset, &feature_len, &offset + feature_len, srcc);
-                offset += feature_len;
-
+                let feature = src.gread_with::<Feature>(&mut offset, endian)?;
                 Some(feature)
             } else {
                 None
             };
-            // dbg!(&offset);
-
-            // dbg!(feature);
 
             // @TODO: offset as u32 can fail (TryFrom is impled for usize)
             if buf_len != offset as u32 {
@@ -249,21 +216,21 @@ pub mod impl_scroll {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Frame {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
-            let offset = &mut 0;
+            let mut offset = 0;
 
-            this.gwrite_with::<u8>(self.frame_type.into(), offset, ctx)?;
-            this.gwrite_with::<u8>(self.buffer_id.into(), offset, ctx)?;
-            this.gwrite_with::<u8>(self.sequence_id, offset, ctx)?;
+            this.gwrite_with::<u8>(self.frame_type.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>(self.buffer_id.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>(self.sequence_id, &mut offset, ctx)?;
 
-            let buf_length_offset = *offset;
+            let buf_length_offset = offset;
             // reserve bytes for the buffer length (u32)
-            this.gwrite_with::<u32>(0, offset, ctx)?;
+            this.gwrite_with::<u32>(0, &mut offset, ctx)?;
 
             let feature_length = match self.feature {
-                Some(feature) => this.gwrite_with::<Feature>(feature, offset, ctx)?,
+                Some(feature) => this.gwrite_with::<Feature>(feature, &mut offset, ctx)?,
                 None => 0,
             };
 
@@ -276,30 +243,59 @@ pub mod impl_scroll {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Type {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], _endian: Endian) -> Result<(Self, usize), Self::Error> {
-            let offset = &mut 0;
-            let frame_value = src.gread::<u8>(offset)?;
+            let mut offset = 0;
+            let frame_value = src.gread::<u8>(&mut offset)?;
 
-            Type::try_from(frame_value)
-                .map(|frame_type| (frame_type, *offset))
-                .map_err(|err| scroll::Error::Custom(err.to_string()))
+            let frame_type = match frame_value {
+                0 => Self::Uninitialized,
+                1 => Self::Ack,
+                2 => Self::Data,
+                3 => Self::LowLatency,
+                4 => Self::DataWithAck,
+                5 => Self::Max,
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "Type".to_string(),
+                    })
+                }
+            };
+
+            Ok((frame_type, offset))
         }
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for BufferID {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], _endian: Endian) -> Result<(Self, usize), Self::Error> {
-            let offset = &mut 0;
-            let id_value = src.gread::<u8>(offset)?;
+        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+            let id_value = src.gread::<u8>(&mut offset)?;
 
-            BufferID::try_from(id_value)
-                .map(|buffer_id| (buffer_id, *offset))
-                .map_err(|err| scroll::Error::Custom(err.to_string()))
+            let buffer_id = match id_value {
+                0 => Self::PING,
+                1 => Self::PONG,
+                10 => Self::CDNonAck,
+                11 => Self::CDAck,
+                12 => Self::CDEmergency,
+                13 => Self::CDVideoAck,
+                125 => Self::DCVideo,
+                126 => Self::DCEvent,
+                127 => Self::DCNavdata,
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "BufferID".to_string(),
+                    })
+                }
+            };
+
+            Ok((buffer_id, offset))
         }
     }
 
@@ -325,9 +321,9 @@ pub mod impl_scroll {
                 frame_type: Type::Data,
                 buffer_id: BufferID::CDNonAck,
                 sequence_id: 103,
-                feature: Some(command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(
-                    pilot_state,
-                )))),
+                feature: Some(command::Feature::JumpingSumo(Class::Piloting(
+                    PilotingID::Pilot(pilot_state),
+                ))),
             };
 
             let actual_frame: Frame = message.pread_with(0, LE).unwrap();
@@ -352,13 +348,16 @@ mod frame_tests {
     use crate::common::{self, Class as CommonClass};
     use crate::jumping_sumo::*;
     use chrono::{TimeZone, Utc};
-    use scroll::{LE, Pread, Pwrite};
+    use scroll::{Pread, Pwrite, LE};
 
     use std::convert::TryInto;
 
     #[test]
     fn test_common_date_command() {
-        let expected_message = [0x4, 0xb, 0x1, 0x15, 0x0, 0x0, 0x0, 0x4, 0x1, 0x0, 0x32, 0x30, 0x32, 0x30, 0x2d, 0x30, 0x34, 0x2d, 0x32, 0x36, 0x0];
+        let expected_message = [
+            0x4, 0xb, 0x1, 0x15, 0x0, 0x0, 0x0, 0x4, 0x1, 0x0, 0x32, 0x30, 0x32, 0x30, 0x2d, 0x30,
+            0x34, 0x2d, 0x32, 0x36, 0x0,
+        ];
 
         let date = Utc.ymd(2020, 04, 26).and_hms(15, 06, 11);
 
@@ -366,9 +365,9 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 1,
-            feature: Some(command::Feature::Common(CommonClass::Common(common::Common::CurrentDate(
-                date,
-            )))),
+            feature: Some(command::Feature::Common(CommonClass::Common(
+                common::Common::CurrentDate(date),
+            ))),
         };
 
         // assert_frames_match(&expected_message, frame);
@@ -376,7 +375,10 @@ mod frame_tests {
 
     #[test]
     fn test_common_time_command() {
-        let expected_message = [0x4, 0xb, 0x2, 0x15, 0x0, 0x0, 0x0, 0x4, 0x2, 0x0, 0x54, 0x31, 0x35, 0x30, 0x36, 0x31, 0x31, 0x30, 0x30, 0x30, 0x0];
+        let expected_message = [
+            0x4, 0xb, 0x2, 0x15, 0x0, 0x0, 0x0, 0x4, 0x2, 0x0, 0x54, 0x31, 0x35, 0x30, 0x36, 0x31,
+            0x31, 0x30, 0x30, 0x30, 0x0,
+        ];
 
         let date = Utc.ymd(2020, 04, 26).and_hms(15, 06, 11);
 
@@ -384,9 +386,9 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 2,
-            feature: Some(command::Feature::Common(CommonClass::Common(common::Common::CurrentTime(
-                date,
-            )))),
+            feature: Some(command::Feature::Common(CommonClass::Common(
+                common::Common::CurrentTime(date),
+            ))),
         };
 
         // assert_frames_match(&expected_message, frame);
@@ -394,7 +396,9 @@ mod frame_tests {
 
     #[test]
     fn test_jumpingsumo_move_command() {
-        let expected_message = [0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c];
+        let expected_message = [
+            0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c,
+        ];
 
         let pilot_state = PilotState {
             flag: true,
@@ -406,7 +410,9 @@ mod frame_tests {
             frame_type: Type::Data,
             buffer_id: BufferID::CDNonAck,
             sequence_id: 103,
-            feature: Some(command::Feature::JumpingSumo(Class::Piloting(PilotingID::Pilot(pilot_state)))),
+            feature: Some(command::Feature::JumpingSumo(Class::Piloting(
+                PilotingID::Pilot(pilot_state),
+            ))),
         };
 
         assert_frames_match(&expected_message, frame);
@@ -414,10 +420,13 @@ mod frame_tests {
 
     #[test]
     fn test_jumpingsumo_jump_command() {
-
         //                              type buf  seq  [         len      ] [JS  Anim Jump       DATA                 ]
-        let expected_message = [0x4, 0xb, 0x1, 0xf, 0x0, 0x0, 0x0, 0x3, 0x2, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0];
-        let buf_len: u32 = (&expected_message[3..7]).pread_with(0, LE).expect("should read a u32");
+        let expected_message = [
+            0x4, 0xb, 0x1, 0xf, 0x0, 0x0, 0x0, 0x3, 0x2, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0,
+        ];
+        let buf_len: u32 = (&expected_message[3..7])
+            .pread_with(0, LE)
+            .expect("should read a u32");
 
         assert_eq!(buf_len, 15);
         assert_eq!(buf_len as usize, expected_message.len());
@@ -432,11 +441,17 @@ mod frame_tests {
         assert_frames_match(&expected_message, frame);
     }
 
-
     fn assert_frames_match(expected: &[u8], frame: Frame) {
-        assert_eq!(expected.pread_with::<Frame>(0, LE).expect("Should deserialize"), frame);
+        assert_eq!(
+            expected
+                .pread_with::<Frame>(0, LE)
+                .expect("Should deserialize"),
+            frame
+        );
         let mut actual = [0_u8; 4086];
-        let actual_written = actual.pwrite_with::<Frame>(frame, 0, LE).expect("Should serialize");
+        let actual_written = actual
+            .pwrite_with::<Frame>(frame, 0, LE)
+            .expect("Should serialize");
 
         assert_eq!(expected, &actual[..actual_written]);
     }

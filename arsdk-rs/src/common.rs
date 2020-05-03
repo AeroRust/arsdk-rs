@@ -1,4 +1,3 @@
-use crate::frame::Data;
 use chrono::{offset::Utc, DateTime};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -45,40 +44,6 @@ pub enum Common {
     CurrentDate(DateTime<Utc>), // ARCOMMANDS_ID_COMMON_COMMON_CMD_CURRENTDATE = 1,
     CurrentTime(DateTime<Utc>), // ARCOMMANDS_ID_COMMON_COMMON_CMD_CURRENTTIME = 2,
     Reboot,                     // ARCOMMANDS_ID_COMMON_COMMON_CMD_REBOOT = 3,
-}
-
-impl Data for Class {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match self {
-            Self::Common(common_command) => {
-                buf.extend(common_command.serialize());
-            }
-            _ => {}
-        }
-        buf
-    }
-}
-
-impl Data for Common {
-    fn serialize(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        buf.push(self.clone().into());
-        match self {
-            Self::CurrentDate(date) => {
-                buf.extend(format_date(date));
-                // null terminated C string
-                buf.push(0);
-            }
-            Self::CurrentTime(time) => {
-                buf.extend(format_time(time)); // null terminated C string
-                buf.push(0);
-            }
-            _ => {}
-        }
-        buf
-    }
 }
 
 // "yyyy-MM-dd"forCommon.Common.CurrentDate.  Ex:2015-08-27
@@ -147,9 +112,10 @@ impl Into<u8> for Common {
 pub mod scroll_impl {
     use super::*;
     use scroll::{ctx, Endian, Pread, Pwrite};
+    use crate::MessageError;
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
@@ -194,7 +160,12 @@ pub mod scroll_impl {
                 31 => Self::Factory,
                 32 => Self::FlightPlanSettings,
                 33 => Self::FlightPlanSettingsState,
-                _ => return Err(scroll::Error::Custom("Out of range".into())),
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "Class".to_string(),
+                    })
+                }
             };
 
             Ok((class, offset))
@@ -202,18 +173,35 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Common {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
-        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
-            let ser_common = self.serialize();
-            let written = this.pwrite_with(ser_common.as_slice(), 0, ())?;
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
 
-            Ok(written)
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+
+            match self {
+                Self::CurrentDate(date) => {
+                    let mut date = format_date(&date);
+                    // null terminated C string
+                    date.push(0);
+                    this.gwrite_with::<&[u8]>(date.as_ref(), &mut offset, ())?;
+                }
+                Self::CurrentTime(time) => {
+                    // null terminated C string
+                    let mut time = format_time(&time);
+                    time.push(0);
+                    this.gwrite_with::<&[u8]>(time.as_ref(), &mut offset, ())?;
+                }
+                _ => unimplemented!(),
+            }
+
+            Ok(offset)
         }
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Common {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
             use Common::*;
@@ -226,7 +214,12 @@ pub mod scroll_impl {
                 // @TODO: FIX THIS!
                 2 => CurrentTime(Utc::now()),
                 3 => Reboot,
-                _ => return Err(scroll::Error::Custom("Out of range".into())),
+                value => {
+                    return Err(MessageError::OutOfBound {
+                        value: value.into(),
+                        param: "Common".to_string(),
+                    })
+                }
             };
 
             Ok((common, offset))
@@ -234,13 +227,20 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Class {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
-        fn try_into_ctx(self, this: &mut [u8], _ctx: Endian) -> Result<usize, Self::Error> {
-            let ser_class = self.serialize();
-            let written = this.pwrite_with(ser_class.as_slice(), 0, ())?;
+        fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
+            let mut offset = 0;
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
 
-            Ok(written)
+            match self {
+                Self::Common(common) => {
+                    this.gwrite_with(common, &mut offset, ctx)?;
+                },
+                _ => unimplemented!(),
+            };
+
+            Ok(offset)
         }
     }
 }

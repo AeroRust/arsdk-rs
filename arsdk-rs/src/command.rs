@@ -1,6 +1,5 @@
 use crate::ardrone3::ArDrone3;
 use crate::common;
-use crate::frame::Data;
 use crate::jumping_sumo;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -63,7 +62,6 @@ pub mod scroll_impl {
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
-
             let feature = match src.gread_with::<u8>(&mut offset, endian)? {
                 0 => {
                     let common = src.gread_with(&mut offset, endian)?;
@@ -108,17 +106,25 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Feature {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
 
-            // @TODO: FIX THIS!
             this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
-            let ser_feature: [u8; 5] = [1_u8; 5];
 
-            let written = this.gwrite_with(ser_feature.as_ref(), &mut offset, ())?;
-            Ok(dbg!(written))
+            match self {
+                Self::Common(common) => {
+                    this.gwrite_with(common, &mut offset, ctx)?;
+                },
+                // Self::ArDrone3(ardrone3) => this.gwrite_with(ardrone3, &mut offset, ctx)?,
+                Self::JumpingSumo(js) => {
+                    this.gwrite_with(js, &mut offset, ctx)?;
+                },
+                _ => unimplemented!(),
+            }
+
+            Ok(offset)
         }
     }
 }

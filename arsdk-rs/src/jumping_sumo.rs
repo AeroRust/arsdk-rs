@@ -1,5 +1,3 @@
-use crate::frame::Data;
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum JumpType {
     LONG,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
@@ -120,7 +118,7 @@ pub mod scroll_impl {
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let class = match src.gread_with::<u16>(&mut offset, endian)? {
+            let class = match src.gread_with::<u8>(&mut offset, endian)? {
                 0 => {
                     let pilot_state = src.gread_with(&mut offset, endian)?;
 
@@ -131,7 +129,7 @@ pub mod scroll_impl {
                     let anim = src.gread_with(&mut offset, endian)?;
 
                     Self::Animations(anim)
-                },
+                }
                 3 => Self::AnimationsState,
                 5 => Self::SettingsState,
                 6 => Self::MediaRecord,
@@ -164,14 +162,23 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Class {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
 
-            let written = this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            match self {
+                Self::Piloting(piloting_id) => {
+                    this.gwrite_with(piloting_id, &mut offset, ctx)?;
+                },
+                Self::Animations(anim) => {
+                    this.gwrite_with(anim, &mut offset, ctx)?;
+                }
+                _ => {},
+            }
 
-            Ok(written)
+            Ok(offset)
         }
     }
 
@@ -212,11 +219,11 @@ pub mod scroll_impl {
             match self {
                 Self::Pilot(state) => {
                     this.gwrite_with(state, &mut offset, ctx)?;
-                },
+                }
                 _ => {}
             }
 
-            Ok(offset + 1)
+            Ok(offset)
         }
     }
 
@@ -256,7 +263,7 @@ pub mod scroll_impl {
             this.gwrite_with(self.speed, &mut offset, ctx)?;
             this.gwrite_with(self.turn, &mut offset, ctx)?;
 
-            Ok(offset + 1)
+            Ok(offset)
         }
     }
 
@@ -267,7 +274,7 @@ pub mod scroll_impl {
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+            let anim = match src.gread_with::<u8>(&mut offset, endian)? {
                 0 => Self::JumpStop,
                 1 => Self::JumpCancel,
                 2 => Self::JumpLoad,
@@ -281,20 +288,21 @@ pub mod scroll_impl {
                 }
             };
 
+            let mut anim_data = [0_u8; 5];
+            src.gread_inout_with(&mut offset, &mut anim_data, endian)?;
 
-
-            Ok((class, offset))
+            Ok((anim, offset))
         }
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Anim {
-        type Error = scroll::Error;
+        type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset: usize = 0;
             this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
             // TODO: FIX THIS!
-            let dummy_anim = [1_u8; 5];
+            let dummy_anim = [0_u8; 5];
             this.gwrite_with(dummy_anim.as_ref(), &mut offset, ())?;
 
             Ok(offset)
