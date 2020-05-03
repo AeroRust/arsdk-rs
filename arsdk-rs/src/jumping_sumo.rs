@@ -175,7 +175,7 @@ pub mod scroll_impl {
                 Self::Animations(anim) => {
                     this.gwrite_with(anim, &mut offset, ctx)?;
                 }
-                _ => {}
+                _ => unimplemented!("Not all Class are impled"),
             }
 
             Ok(offset)
@@ -220,7 +220,7 @@ pub mod scroll_impl {
                 Self::Pilot(state) => {
                     this.gwrite_with(state, &mut offset, ctx)?;
                 }
-                _ => {}
+                _ => unimplemented!("Not all PilotingID are impled"),
             }
 
             Ok(offset)

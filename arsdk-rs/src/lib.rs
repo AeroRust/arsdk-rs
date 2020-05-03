@@ -192,7 +192,7 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
                         "Received: {} bytes from {} Bytes: {}",
                         bytes_read,
                         origin,
-                        print_buf(&buf)
+                        print_buf(&buf[..bytes_read - 1])
                     );
 
                     let frame_type = frame::Type::Data;

@@ -117,11 +117,13 @@ pub mod scroll_impl {
                 Self::Common(common) => {
                     this.gwrite_with(common, &mut offset, ctx)?;
                 }
-                // Self::ArDrone3(ardrone3) => this.gwrite_with(ardrone3, &mut offset, ctx)?,
+                Self::ArDrone3(ardrone3) => {
+                    this.gwrite_with(ardrone3, &mut offset, ctx)?;
+                }
                 Self::JumpingSumo(js) => {
                     this.gwrite_with(js, &mut offset, ctx)?;
                 }
-                _ => unimplemented!(),
+                _ => unimplemented!("Not all Features are impled"),
             }
 
             Ok(offset)

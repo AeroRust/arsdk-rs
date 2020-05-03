@@ -193,7 +193,7 @@ pub mod scroll_impl {
                     time.push(0);
                     this.gwrite_with::<&[u8]>(time.as_ref(), &mut offset, ())?;
                 }
-                _ => unimplemented!(),
+                _ => unimplemented!("Not all Common are impled"),
             }
 
             Ok(offset)
@@ -237,7 +237,7 @@ pub mod scroll_impl {
                 Self::Common(common) => {
                     this.gwrite_with(common, &mut offset, ctx)?;
                 }
-                _ => unimplemented!(),
+                _ => unimplemented!("Not all Class are impled"),
             };
 
             Ok(offset)
