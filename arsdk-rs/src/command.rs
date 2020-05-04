@@ -116,9 +116,8 @@ pub mod scroll_impl {
                 unknown_feature => {
                     let mut feature_data = [0_u8; 256];
                     let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
-                    // assert_eq!(actual_written, feature_data[..actual_written].len());
+                    assert_eq!(actual_written, feature_data[..actual_written].len());
                     offset += actual_written;
-                    // dbg!(offset, actual_written, )
 
                     Self::Unknown {
                         feature: unknown_feature,
