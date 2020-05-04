@@ -40,12 +40,13 @@ pub mod scroll_impl {
         type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             use ArDrone3::*;
 
-            let offset = &mut 0;
+            let mut offset = 0;
 
-            let ardrone3 = match src.gread_with::<u16>(offset, endian)? {
+            // TODO: CHeck if ArDrone3 should be read as u16!!!
+            let ardrone3 = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => FlatTrim,
                 1 => TakeOff,
                 2 => PCMD,
@@ -68,7 +69,7 @@ pub mod scroll_impl {
                 }
             };
 
-            Ok((ardrone3, *offset))
+            Ok((ardrone3, offset))
         }
     }
 

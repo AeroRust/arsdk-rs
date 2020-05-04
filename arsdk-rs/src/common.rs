@@ -303,6 +303,7 @@ mod common_tests {
         assert_class(Class::Factory, 31);
     }
 
+    #[test]
     fn test_common() {
         assert_common(Common::AllStates, 0);
         assert_common(Common::CurrentDate(chrono::offset::Utc::now()), 1);

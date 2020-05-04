@@ -3,7 +3,7 @@ use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use pnet::datalink;
-use scroll::Pread;
+use scroll::{ctx::TryIntoCtx, Pread, LE};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::{
     mpsc::{sync_channel, Receiver, SyncSender},
@@ -115,8 +115,6 @@ impl Drone {
     }
 
     pub fn send_frame(&self, frame: frame::Frame) -> AnyResult<()> {
-        use scroll::{ctx::TryIntoCtx, LE};
-
         let mut raw_message = [0_u8; 2048];
         let written = frame.try_into_ctx(&mut raw_message, LE)?;
 
@@ -187,21 +185,31 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
         loop {
             let mut buf = [0_u8; 256];
             if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
-                if buf[1] == frame::BufferID::PING as u8 {
-                    println!(
-                        "Received: {} bytes from {} Bytes: {}",
-                        bytes_read,
-                        origin,
-                        print_buf(&buf[..bytes_read - 1])
-                    );
+                println!("Received: {} bytes from {}", bytes_read, origin);
 
-                    let frame_type = frame::Type::Data;
-                    let buffer_id = frame::BufferID::PONG;
+                let frame = match buf[..bytes_read].pread_with::<Frame>(0, LE) {
+                    Ok(frame) => Some(frame),
+                    Err(err) => {
+                        println!("Unknown Frame: {}", err);
+                        println!("Bytes: {}", print_buf(&buf[..bytes_read]));
 
-                    let pong = frame::Frame::for_drone(&drone, frame_type, buffer_id, None);
+                        None
+                    }
+                };
 
-                    drone.send_frame(pong).expect("Should PONG successfully!");
+                match frame {
+                    Some(frame) if frame.buffer_id == frame::BufferID::PING => {
+                        let frame_type = frame::Type::Data;
+                        let buffer_id = frame::BufferID::PONG;
+
+                        let pong = frame::Frame::for_drone(&drone, frame_type, buffer_id, None);
+
+                        drone.send_frame(pong).expect("Should PONG successfully!");
+                    }
+                    _ => {}
                 }
+
+                println!();
             }
         }
     });
@@ -211,7 +219,7 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
 
 fn print_buf(buf: &[u8]) -> String {
     buf.iter()
-        .map(|byte| format!("{:#x}", byte))
+        .map(|byte| format!("{}", byte))
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -229,10 +237,9 @@ fn spawn_cmd_sender(
     std::thread::spawn(move || loop {
         let frame_to_send = rx.recv().expect("couldn't receive frame.");
 
-        use scroll::LE;
         let frame = frame_to_send.pread_with::<Frame>(0, LE);
 
-        println!(
+        dbg!(
             "Sent Frame (length: {}) => {:#?}",
             frame_to_send.len(),
             &frame

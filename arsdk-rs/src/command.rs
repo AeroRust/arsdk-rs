@@ -2,7 +2,7 @@ use crate::ardrone3::ArDrone3;
 use crate::common;
 use crate::jumping_sumo;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     ArDrone3(ArDrone3),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
@@ -22,31 +22,42 @@ pub enum Feature {
     ThermalCam,                       // ARCOMMANDS_ID_FEATURE_THERMAL_CAM = 142,
     Animation,                        // ARCOMMANDS_ID_FEATURE_ANIMATION = 144,
     SequoiaCam,                       // ARCOMMANDS_ID_FEATURE_SEQUOIA_CAM = 147,
+    /// Temporary Enum for storing unknown Features:
+    /// TODO: REMOVE!
+    Unknown {
+        feature: u8,
+        data: Vec<u8>,
+    },
 }
 
 // --------------------- Conversion impls --------------------- //
 
-impl Into<u8> for Feature {
+impl Into<u8> for &Feature {
     fn into(self) -> u8 {
+        use Feature::*;
+
         match self {
-            Self::Common(_) => 0,
-            Self::ArDrone3(_) => 1,
-            Self::Minidrone => 2,
-            Self::JumpingSumo(_) => 3,
-            Self::SkyController => 4,
-            Self::PowerUp => 8,
-            Self::Generic => 133,
-            Self::FollowMe => 134,
-            Self::Wifi => 135,
-            Self::RC => 136,
-            Self::DroneManager => 137,
-            Self::Mapper => 138,
-            Self::Debug => 139,
-            Self::ControllerInfo => 140,
-            Self::MapperMini => 141,
-            Self::ThermalCam => 142,
-            Self::Animation => 144,
-            Self::SequoiaCam => 147,
+            Common(_) => 0,
+            ArDrone3(_) => 1,
+            Minidrone => 2,
+            JumpingSumo(_) => 3,
+            SkyController => 4,
+            PowerUp => 8,
+            Generic => 133,
+            FollowMe => 134,
+            Wifi => 135,
+            RC => 136,
+            DroneManager => 137,
+            Mapper => 138,
+            Debug => 139,
+            ControllerInfo => 140,
+            MapperMini => 141,
+            ThermalCam => 142,
+            Animation => 144,
+            SequoiaCam => 147,
+            // Temporary Enum for storing unknown Features:
+            // TODO: REMOVE!
+            Unknown { feature, .. } => *feature,
         }
     }
 }
@@ -60,44 +71,59 @@ pub mod scroll_impl {
         type Error = MessageError;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
-            let feature = match src.gread_with::<u8>(&mut offset, endian)? {
+            let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => {
-                    let common = src.gread_with(&mut offset, endian)?;
+                    let common = src.gread_with(&mut offset, ctx)?;
 
                     Self::Common(common)
                 }
-                1 => {
-                    let ardrone3 = src.gread_with(&mut offset, endian)?;
+                // 1 => {
+                //     let ardrone = src.gread_with::<ArDrone>(&mut offset, endian)?;
+                //     // println!("{}", crate::print_buf(&ardrone.data));
 
-                    Self::ArDrone3(ardrone3)
-                }
-                2 => Self::Minidrone,
+                //     Self::ArDrone3(ardrone.ardrone3)
+                // }
                 3 => {
-                    let js_class = src.gread_with(&mut offset, endian)?;
+                    let js_class = src.gread_with(&mut offset, ctx)?;
 
-                    Feature::JumpingSumo(js_class)
+                    Self::JumpingSumo(js_class)
                 }
-                4 => Self::SkyController,
-                8 => Self::PowerUp,
-                133 => Self::Generic,
-                134 => Self::FollowMe,
-                135 => Self::Wifi,
-                136 => Self::RC,
-                137 => Self::DroneManager,
-                138 => Self::Mapper,
-                139 => Self::Debug,
-                140 => Self::ControllerInfo,
-                141 => Self::MapperMini,
-                142 => Self::ThermalCam,
-                144 => Self::Animation,
-                147 => Self::SequoiaCam,
-                value => {
-                    return Err(Self::Error::OutOfBound {
-                        value: value.into(),
-                        param: "Feature".to_string(),
-                    })
+                // 2 => Self::Minidrone,
+                // 4 => Self::SkyController,
+                // 8 => Self::PowerUp,
+                // 133 => Self::Generic,
+                // 134 => Self::FollowMe,
+                // 135 => Self::Wifi,
+                // 136 => Self::RC,
+                // 137 => Self::DroneManager,
+                // 138 => Self::Mapper,
+                // 139 => Self::Debug,
+                // 140 => Self::ControllerInfo,
+                // 141 => Self::MapperMini,
+                // 142 => Self::ThermalCam,
+                // 144 => Self::Animation,
+                // 147 => Self::SequoiaCam,
+                // value => {
+                //     return Err(Self::Error::OutOfBound {
+                //         value: value.into(),
+                //         param: "Feature".to_string(),
+                //     })
+                // }
+                // Temporary Enum for storing unknown Features:
+                // TODO: REMOVE!
+                unknown_feature => {
+                    let mut feature_data = [0_u8; 256];
+                    let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
+                    // assert_eq!(actual_written, feature_data[..actual_written].len());
+                    offset += actual_written;
+                    // dbg!(offset, actual_written, )
+
+                    Self::Unknown {
+                        feature: unknown_feature,
+                        data: feature_data[..actual_written].to_vec(),
+                    }
                 }
             };
 
@@ -111,17 +137,20 @@ pub mod scroll_impl {
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
 
-            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>((&self).into(), &mut offset, ctx)?;
 
             match self {
-                Self::Common(common) => {
-                    this.gwrite_with(common, &mut offset, ctx)?;
-                }
-                Self::ArDrone3(ardrone3) => {
-                    this.gwrite_with(ardrone3, &mut offset, ctx)?;
-                }
+                // Self::Common(common) => {
+                //     this.gwrite_with(common, &mut offset, ctx)?;
+                // }
+                // Self::ArDrone3(ardrone3) => {
+                //     this.gwrite_with(ardrone3, &mut offset, ctx)?;
+                // }
                 Self::JumpingSumo(js) => {
                     this.gwrite_with(js, &mut offset, ctx)?;
+                }
+                Self::Unknown { data, .. } => {
+                    this.gwrite_with(data.as_slice(), &mut offset, ())?;
                 }
                 _ => unimplemented!("Not all Features are impled"),
             }
@@ -166,7 +195,7 @@ mod command_tests {
         assert_feature(Feature::SequoiaCam, 147);
     }
 
-    fn assert_feature(f: Feature, v: u8) {
+    fn assert_feature(ref f: Feature, v: u8) {
         let as_u8: u8 = f.into();
         assert_eq!(v, as_u8);
     }
