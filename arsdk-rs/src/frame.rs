@@ -200,7 +200,8 @@ pub mod impl_scroll {
             let feature = if buf_len > 7 {
                 // we can receive multiple frames, so the feature should be limited
                 // to buf_len from source
-                let feature = src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, endian)?;
+                let feature =
+                    src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, endian)?;
 
                 Some(feature)
             } else {

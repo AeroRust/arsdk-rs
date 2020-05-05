@@ -191,7 +191,6 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
                 info!("Received: {} bytes from {}", bytes_read, origin);
                 info!("Bytes: {}", print_buf(&buf[..bytes_read]));
 
-
                 for frame_result in parse_message_frames(&buf[..bytes_read]) {
                     let frame = match frame_result {
                         Ok(frame) => {
@@ -216,8 +215,12 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
                             let buffer_id = frame::BufferID::PONG;
 
                             // send the same feature back
-                            let pong =
-                                frame::Frame::for_drone(&drone, frame_type, buffer_id, frame.feature);
+                            let pong = frame::Frame::for_drone(
+                                &drone,
+                                frame_type,
+                                buffer_id,
+                                frame.feature,
+                            );
 
                             drone.send_frame(pong).expect("Should PONG successfully!");
                         }
@@ -263,7 +266,7 @@ fn spawn_cmd_sender(
                     );
                 }
                 _ => {}
-            }
+            },
             _ => {}
         }
         // info!(
@@ -299,11 +302,10 @@ fn parse_message_frames(buf: &[u8]) -> Vec<Result<Frame>> {
 mod test {
     use super::*;
     use command::Feature;
-    use frame::{Type, BufferID};
+    use frame::{BufferID, Type};
 
     #[test]
     fn receiving_two_frames_at_once() {
-
         let received: [u8; 58] = [
             // Type::Data = 2
             // BufferID::PING = 0
@@ -316,7 +318,8 @@ mod test {
             // Sequence: 71
             // Frame size: 35
             // Feature: 1
-            2, 127, 71, 35, 0, 0, 0, 1, 4, 4, 0, 0, 0, 0, 0, 0, 64, 127, 64, 0, 0, 0, 0, 0, 64, 127, 64, 0, 0, 0, 0, 0, 64, 127, 64
+            2, 127, 71, 35, 0, 0, 0, 1, 4, 4, 0, 0, 0, 0, 0, 0, 64, 127, 64, 0, 0, 0, 0, 0, 64, 127,
+            64, 0, 0, 0, 0, 0, 64, 127, 64,
         ];
         let expected_first_frame_length = 23; // [23, 0, 0, 0]
 
@@ -349,8 +352,18 @@ mod test {
             }),
         };
 
-        assert_eq!(&first_expected, frames[0].as_ref().expect("Should deserialize first (PING) frame"));
-        assert_eq!(&second_expected, frames[1].as_ref().expect("Should deserialize second (DCNavdata) frame"));
+        assert_eq!(
+            &first_expected,
+            frames[0]
+                .as_ref()
+                .expect("Should deserialize first (PING) frame")
+        );
+        assert_eq!(
+            &second_expected,
+            frames[1]
+                .as_ref()
+                .expect("Should deserialize second (DCNavdata) frame")
+        );
     }
 
     #[test]
@@ -360,6 +373,8 @@ mod test {
             // frist frame
             2, 0, 23, 23, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 123, 61, 147, 11, 0, 0, 0, 0,
             // second frame
-            2, 127, 26, 23, 0, 0, 0, 1, 4, 5, 0, 22, 144, 125, 184, 167, 42, 112, 58, 252, 101, 132, 185];
+            2, 127, 26, 23, 0, 0, 0, 1, 4, 5, 0, 22, 144, 125, 184, 167, 42, 112, 58, 252, 101, 132,
+            185,
+        ];
     }
 }

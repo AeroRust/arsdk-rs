@@ -124,13 +124,10 @@ pub mod scroll_impl {
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
-
             let mut offset = 0;
 
             let ardrone3 = match src.gread_with::<u8>(&mut offset, ctx)? {
-                0 => {
-                    Self::Piloting(src.gread_with(&mut offset, ctx)?)
-                },
+                0 => Self::Piloting(src.gread_with(&mut offset, ctx)?),
                 // 1 => Self::Camera,
                 // 2 => Self::PilotingSettings,
                 // 3 => Self::MediaRecordEvent,

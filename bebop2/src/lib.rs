@@ -4,11 +4,17 @@ use arsdk_rs::{
     frame::{BufferID, Frame, Type},
 };
 
-pub use arsdk_rs::{ardrone3::{Piloting, ArDrone3}, prelude::*};
+pub use arsdk_rs::{
+    ardrone3::{ArDrone3, Piloting},
+    prelude::*,
+};
 
 pub mod prelude {
     pub use crate::Bebop2;
-    pub use arsdk_rs::{ardrone3::{Piloting, ArDrone3}, prelude::*};
+    pub use arsdk_rs::{
+        ardrone3::{ArDrone3, Piloting},
+        prelude::*,
+    };
 }
 
 pub struct Bebop2 {

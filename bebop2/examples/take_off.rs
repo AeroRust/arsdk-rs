@@ -3,7 +3,7 @@ use std::error::Error;
 use bebop2::prelude::*;
 
 #[tokio::main]
-async fn main() -> Result<(), Box <dyn Error>> {
+async fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
 
     let drone = Bebop2::connect(PARROT_SPHINX_CONFIG)?;
@@ -16,7 +16,6 @@ async fn main() -> Result<(), Box <dyn Error>> {
 
     loop {
         // loop endlessly
-
     }
 
     Ok(())

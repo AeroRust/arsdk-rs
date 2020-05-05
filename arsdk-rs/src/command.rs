@@ -5,7 +5,7 @@ use crate::jumping_sumo;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
-    ArDrone3(Option<ArDrone3>),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
+    ArDrone3(Option<ArDrone3>),       // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
     Minidrone,                        // ARCOMMANDS_ID_FEATURE_MINIDRONE = 2,
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
     SkyController,                    // ARCOMMANDS_ID_FEATURE_SKYCONTROLLER = 4,
@@ -85,7 +85,6 @@ pub mod scroll_impl {
                     } else {
                         None
                     };
-
 
                     Self::ArDrone3(ardrone3)
                 }
