@@ -34,6 +34,8 @@ pub mod prelude {
     pub use crate::{Config, Drone, PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP};
 }
 
+pub type Result<T> = std::result::Result<T, MessageError>;
+
 #[derive(Debug, Error)]
 pub enum MessageError {
     #[error("Message parsing error")]
@@ -187,37 +189,41 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
             let mut buf = [0_u8; 256];
             if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
                 info!("Received: {} bytes from {}", bytes_read, origin);
+                info!("Bytes: {}", print_buf(&buf[..bytes_read]));
 
-                let frame = match buf[..bytes_read].pread_with::<Frame>(0, LE) {
-                    Ok(frame) => {
-                        info!("Frame: {:?}", &frame);
-                        Some(frame)
+
+                for frame_result in parse_message_frames(&buf[..bytes_read]) {
+                    let frame = match frame_result {
+                        Ok(frame) => {
+                            // info!("Frame: {:?}", &frame);
+
+                            Some(frame)
+                        }
+                        Err(err) => {
+                            info!("Unknown Frame: {}", err);
+                            info!("Bytes: {}", print_buf(&buf[..bytes_read]));
+
+                            None
+                        }
+                    };
+
+                    // PING-PONG
+                    match frame {
+                        Some(frame) if frame.buffer_id == frame::BufferID::PING => {
+                            // info!("Received PING: {:?}", frame.feature);
+
+                            let frame_type = frame::Type::Data;
+                            let buffer_id = frame::BufferID::PONG;
+
+                            // send the same feature back
+                            let pong =
+                                frame::Frame::for_drone(&drone, frame_type, buffer_id, frame.feature);
+
+                            drone.send_frame(pong).expect("Should PONG successfully!");
+                        }
+                        _ => {}
                     }
-                    Err(err) => {
-                        info!("Unknown Frame: {}", err);
-                        info!("Bytes: {}", print_buf(&buf[..bytes_read]));
-
-                        None
-                    }
-                };
-
-                match frame {
-                    Some(frame) if frame.buffer_id == frame::BufferID::PING => {
-                        info!("Received PING: {:?}", frame.feature);
-
-                        let frame_type = frame::Type::Data;
-                        let buffer_id = frame::BufferID::PONG;
-
-                        // send the same feature back
-                        let pong =
-                            frame::Frame::for_drone(&drone, frame_type, buffer_id, frame.feature);
-
-                        drone.send_frame(pong).expect("Should PONG successfully!");
-                    }
-                    _ => {}
                 }
-
-                println!();
             }
         }
     });
@@ -247,11 +253,24 @@ fn spawn_cmd_sender(
 
         let frame = frame_to_send.pread_with::<Frame>(0, LE);
 
-        info!(
-            "Sent Frame (length: {}) => {:?}",
-            frame_to_send.len(),
-            &frame
-        );
+        match &frame {
+            Ok(frame) => match frame.feature {
+                Some(command::Feature::ArDrone3(_)) => {
+                    info!(
+                        "Sent Frame (length: {}) => {:?}",
+                        frame_to_send.len(),
+                        &frame
+                    );
+                }
+                _ => {}
+            }
+            _ => {}
+        }
+        // info!(
+        //     "Sent Frame (length: {}) => {:?}",
+        //     frame_to_send.len(),
+        //     &frame
+        // );
 
         let size = socket
             .send_to(&frame_to_send, target_addr)
@@ -261,4 +280,86 @@ fn spawn_cmd_sender(
     });
 
     Ok(())
+}
+
+/// we receive 2 frames sometimes
+fn parse_message_frames(buf: &[u8]) -> Vec<Result<Frame>> {
+    let mut offset = 0;
+    // reasonable given that we receive at most (MAYBE?!) 2 messages
+    let mut frames = Vec::with_capacity(3);
+    while offset != buf.len() {
+        let frame = buf.gread_with(&mut offset, LE);
+
+        frames.push(frame);
+    }
+
+    frames
+}
+#[cfg(test)]
+mod test {
+    use super::*;
+    use command::Feature;
+    use frame::{Type, BufferID};
+
+    #[test]
+    fn receiving_two_frames_at_once() {
+
+        let received: [u8; 58] = [
+            // Type::Data = 2
+            // BufferID::PING = 0
+            // Sequence: 4
+            // Frame size: 23
+            // Feature: 9
+            2, 0, 4, 23, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 57, 252, 225, 47, 0, 0, 0, 0,
+            // Type::Data = 2
+            // BufferID::DCNavdata = 127
+            // Sequence: 71
+            // Frame size: 35
+            // Feature: 1
+            2, 127, 71, 35, 0, 0, 0, 1, 4, 4, 0, 0, 0, 0, 0, 0, 64, 127, 64, 0, 0, 0, 0, 0, 64, 127, 64, 0, 0, 0, 0, 0, 64, 127, 64
+        ];
+        let expected_first_frame_length = 23; // [23, 0, 0, 0]
+
+        let frames = parse_message_frames(&received);
+
+        assert_eq!(2, frames.len());
+
+        let first_expected = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::PING,
+            sequence_id: 4,
+            feature: Some(Feature::Unknown {
+                feature: 9,
+                // data starts at 8th bytes
+                data: received[8..expected_first_frame_length].to_vec(),
+            }),
+        };
+
+        // data starts at 8th bytes
+        let second_expected = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::DCNavdata,
+            sequence_id: 71,
+            feature: Some(Feature::Unknown {
+                feature: 1,
+                data: {
+                    let offset = expected_first_frame_length + 8;
+                    received[offset..].to_vec()
+                },
+            }),
+        };
+
+        assert_eq!(&first_expected, frames[0].as_ref().expect("Should deserialize first (PING) frame"));
+        assert_eq!(&second_expected, frames[1].as_ref().expect("Should deserialize second (DCNavdata) frame"));
+    }
+
+    #[test]
+    #[ignore]
+    fn receiving_two_frames_at_once_2() {
+        let message: [u8; 46] = [
+            // frist frame
+            2, 0, 23, 23, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 123, 61, 147, 11, 0, 0, 0, 0,
+            // second frame
+            2, 127, 26, 23, 0, 0, 0, 1, 4, 5, 0, 22, 144, 125, 184, 167, 42, 112, 58, 252, 101, 132, 185];
+    }
 }

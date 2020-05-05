@@ -5,7 +5,7 @@ use crate::jumping_sumo;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Feature {
     Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
-    ArDrone3(ArDrone3),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
+    ArDrone3(Option<ArDrone3>),               // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
     Minidrone,                        // ARCOMMANDS_ID_FEATURE_MINIDRONE = 2,
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
     SkyController,                    // ARCOMMANDS_ID_FEATURE_SKYCONTROLLER = 4,
@@ -74,16 +74,21 @@ pub mod scroll_impl {
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
             let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
-                0 => {
-                    let common = src.gread_with(&mut offset, ctx)?;
+                // 0 => {
+                //     let common = src.gread_with(&mut offset, ctx)?;
 
-                    Self::Common(common)
-                }
-                // 1 => {
-                //     let ardrone = src.gread_with::<ArDrone>(&mut offset, endian)?;
-                //     // println!("{}", crate::print_buf(&ardrone.data));
-                //     Self::ArDrone3(ardrone.ardrone3)
+                //     Self::Common(common)
                 // }
+                1 => {
+                    let ardrone3 = if !src[offset..].is_empty() {
+                        Some(src.gread_with::<ArDrone3>(&mut offset, ctx)?)
+                    } else {
+                        None
+                    };
+
+
+                    Self::ArDrone3(ardrone3)
+                }
                 // 2 => Self::Minidrone,
                 3 => {
                     let js_class = src.gread_with(&mut offset, ctx)?;
@@ -143,9 +148,12 @@ pub mod scroll_impl {
                 // Self::Common(common) => {
                 //     this.gwrite_with(common, &mut offset, ctx)?;
                 // }
-                // Self::ArDrone3(ardrone3) => {
-                //     this.gwrite_with(ardrone3, &mut offset, ctx)?;
-                // }
+                Self::ArDrone3(ardrone3) => {
+                    if let Some(ardrone3) = ardrone3 {
+                        this.gwrite_with(ardrone3, &mut offset, ctx)?;
+                    }
+                    // else leave it empty
+                }
                 Self::JumpingSumo(js) => {
                     this.gwrite_with(js, &mut offset, ctx)?;
                 }
@@ -171,7 +179,7 @@ mod command_tests {
             Feature::Common(common::Class::Common(common::Common::AllStates)),
             0,
         );
-        assert_feature(Feature::ArDrone3(ArDrone3::TakeOff), 1);
+        assert_feature(Feature::ArDrone3(Piloting::TakeOff), 1);
         assert_feature(Feature::Minidrone, 2);
         assert_feature(
             Feature::JumpingSumo(jumping_sumo::Class::Piloting(

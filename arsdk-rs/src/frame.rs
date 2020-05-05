@@ -100,10 +100,16 @@ pub enum BufferID {
     /// PyParrot:
     /// `'ACK_DRONE_DATA' : 127, # drone data that needs an ack`
     DCNavdata = 127,
-    // @TODO: Find the corresponding C definition if there is one and name the new enum variant!
-    // PyParrot:
-    // `'ACK_FROM_SEND_WITH_ACK': 139  # 128 + buffer id for 'SEND_WITH_ACK' is 139`
-    // ACKFromSendWithAck = 139,
+    /// @TODO: Find the corresponding C definition if there is one and name the new enum variant!
+    /// PyParrot:
+    /// `'ACK_FROM_SEND_WITH_ACK': 139  # 128 + buffer id for 'SEND_WITH_ACK' is 139`
+    /// Type = 1
+    /// BufferId = 139
+    /// Sequence = 1
+    /// length = 8
+    /// Feature = 1
+    /// 1 139 1 8 0 0 0 1
+    ACKFromSendWithAck = 139,
 }
 
 // --------------------- Conversion impls --------------------- //
@@ -148,6 +154,7 @@ impl TryFrom<u8> for BufferID {
             125 => Ok(Self::DCVideo),
             126 => Ok(Self::DCEvent),
             127 => Ok(Self::DCNavdata),
+            139 => Ok(Self::ACKFromSendWithAck),
             _ => Err(anyhow!("{} is not a valid frame ID variant", v)),
         }
     }
@@ -165,6 +172,7 @@ impl Into<u8> for BufferID {
             Self::DCVideo => 125,
             Self::DCEvent => 126,
             Self::DCNavdata => 127,
+            Self::ACKFromSendWithAck => 139,
         }
     }
 }
@@ -186,19 +194,23 @@ pub mod impl_scroll {
             let buffer_id = src.gread_with(&mut actual_buf_len, endian)?;
             let sequence_id = src.gread_with(&mut actual_buf_len, endian)?;
             let buf_len: u32 = src.gread_with(&mut actual_buf_len, endian)?;
+            // TODO: Fix this as it might fail, use TryFrom<u32>
+            let buf_len_usize = buf_len as usize;
 
             let feature = if buf_len > 7 {
-                let feature = src.gread_with::<Feature>(&mut actual_buf_len, endian)?;
+                // we can receive multiple frames, so the feature should be limited
+                // to buf_len from source
+                let feature = src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, endian)?;
 
                 Some(feature)
             } else {
                 None
             };
 
-            // @TODO: offset as u32 can fail (TryFrom is impled for usize)
-            if buf_len != actual_buf_len as u32 {
+            if buf_len_usize != actual_buf_len {
                 return Err(Self::Error::BytesLength {
                     expected: buf_len,
+                    // @TODO: actual_buf_len as u32 can fail (TryFrom is impled for usize)
                     actual: actual_buf_len as u32,
                 });
             }
@@ -294,6 +306,7 @@ pub mod impl_scroll {
                 125 => Self::DCVideo,
                 126 => Self::DCEvent,
                 127 => Self::DCNavdata,
+                139 => Self::ACKFromSendWithAck,
                 value => {
                     return Err(MessageError::OutOfBound {
                         value: value.into(),
