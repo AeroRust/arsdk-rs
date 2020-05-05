@@ -2,6 +2,7 @@ use crate::frame::Frame;
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use log::info;
 use pnet::datalink;
 use scroll::{ctx::TryIntoCtx, Pread, LE};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs, UdpSocket};
@@ -185,13 +186,16 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
         loop {
             let mut buf = [0_u8; 256];
             if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
-                println!("Received: {} bytes from {}", bytes_read, origin);
+                info!("Received: {} bytes from {}", bytes_read, origin);
 
                 let frame = match buf[..bytes_read].pread_with::<Frame>(0, LE) {
-                    Ok(frame) => Some(frame),
+                    Ok(frame) => {
+                        info!("Frame: {:?}", &frame);
+                        Some(frame)
+                    }
                     Err(err) => {
-                        println!("Unknown Frame: {}", err);
-                        println!("Bytes: {}", print_buf(&buf[..bytes_read]));
+                        info!("Unknown Frame: {}", err);
+                        info!("Bytes: {}", print_buf(&buf[..bytes_read]));
 
                         None
                     }
@@ -199,10 +203,14 @@ fn spawn_listener(drone: Drone, addr: impl ToSocketAddrs) -> AnyResult<()> {
 
                 match frame {
                     Some(frame) if frame.buffer_id == frame::BufferID::PING => {
+                        info!("Received PING: {:?}", frame.feature);
+
                         let frame_type = frame::Type::Data;
                         let buffer_id = frame::BufferID::PONG;
 
-                        let pong = frame::Frame::for_drone(&drone, frame_type, buffer_id, None);
+                        // send the same feature back
+                        let pong =
+                            frame::Frame::for_drone(&drone, frame_type, buffer_id, frame.feature);
 
                         drone.send_frame(pong).expect("Should PONG successfully!");
                     }
@@ -239,8 +247,8 @@ fn spawn_cmd_sender(
 
         let frame = frame_to_send.pread_with::<Frame>(0, LE);
 
-        dbg!(
-            "Sent Frame (length: {}) => {:#?}",
+        info!(
+            "Sent Frame (length: {}) => {:?}",
             frame_to_send.len(),
             &frame
         );

@@ -3,6 +3,8 @@ use std::error::Error;
 use bebop2::prelude::*;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
+
     let drone = Bebop2::connect(PARROT_SPHINX_CONFIG)?;
 
     std::thread::sleep(std::time::Duration::from_secs(20));

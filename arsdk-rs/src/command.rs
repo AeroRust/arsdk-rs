@@ -118,7 +118,6 @@ pub mod scroll_impl {
 
                     assert_eq!(actual_written, feature_data[..actual_written].len());
 
-
                     offset += actual_written;
 
                     Self::Unknown {
