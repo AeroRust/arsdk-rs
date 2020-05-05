@@ -13,3 +13,4 @@ arsdk-rs = { path = "../arsdk-rs" }
 [dev-dependencies]
 # Used for examples
 env_logger = "0.7"
+tokio = {version = "0.2", features = ["rt-threaded", "macros", "time"]}
