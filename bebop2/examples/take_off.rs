@@ -2,16 +2,22 @@ use std::error::Error;
 
 use bebop2::prelude::*;
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box <dyn Error>> {
     env_logger::init();
 
     let drone = Bebop2::connect(PARROT_SPHINX_CONFIG)?;
 
-    std::thread::sleep(std::time::Duration::from_secs(20));
-    drone.take_off()?;
-    std::thread::sleep(std::time::Duration::from_secs(20));
-    std::thread::sleep(std::time::Duration::from_secs(20));
+    tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
 
-    println!("commands ended");
+    drone.take_off()?;
+    // tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+    // drone.landing()?;
+
+    loop {
+        // loop endlessly
+
+    }
+
     Ok(())
 }
