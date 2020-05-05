@@ -172,29 +172,19 @@ pub mod scroll_impl {
         }
     }
 
-    impl<'a> ctx::TryIntoCtx<Endian> for Common {
+    impl<'a> ctx::TryIntoCtx<Endian> for Class {
         type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
-
             this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
 
             match self {
-                Self::CurrentDate(date) => {
-                    let mut date = format_date(&date);
-                    // null terminated C string
-                    date.push(0);
-                    this.gwrite_with::<&[u8]>(date.as_ref(), &mut offset, ())?;
+                Self::Common(common) => {
+                    this.gwrite_with(common, &mut offset, ctx)?;
                 }
-                Self::CurrentTime(time) => {
-                    // null terminated C string
-                    let mut time = format_time(&time);
-                    time.push(0);
-                    this.gwrite_with::<&[u8]>(time.as_ref(), &mut offset, ())?;
-                }
-                _ => unimplemented!("Not all Common are impled"),
-            }
+                _ => unimplemented!("Not all Class are impled"),
+            };
 
             Ok(offset)
         }
@@ -226,19 +216,29 @@ pub mod scroll_impl {
         }
     }
 
-    impl<'a> ctx::TryIntoCtx<Endian> for Class {
+    impl<'a> ctx::TryIntoCtx<Endian> for Common {
         type Error = MessageError;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
+
             this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
 
             match self {
-                Self::Common(common) => {
-                    this.gwrite_with(common, &mut offset, ctx)?;
+                Self::CurrentDate(date) => {
+                    let mut date = format_date(&date);
+                    // null terminated C string
+                    date.push(0);
+                    this.gwrite_with::<&[u8]>(date.as_ref(), &mut offset, ())?;
                 }
-                _ => unimplemented!("Not all Class are impled"),
-            };
+                Self::CurrentTime(time) => {
+                    // null terminated C string
+                    let mut time = format_time(&time);
+                    time.push(0);
+                    this.gwrite_with::<&[u8]>(time.as_ref(), &mut offset, ())?;
+                }
+                _ => unimplemented!("Not all Common are impled"),
+            }
 
             Ok(offset)
         }

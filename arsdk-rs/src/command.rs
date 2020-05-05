@@ -82,15 +82,14 @@ pub mod scroll_impl {
                 // 1 => {
                 //     let ardrone = src.gread_with::<ArDrone>(&mut offset, endian)?;
                 //     // println!("{}", crate::print_buf(&ardrone.data));
-
                 //     Self::ArDrone3(ardrone.ardrone3)
                 // }
+                // 2 => Self::Minidrone,
                 3 => {
                     let js_class = src.gread_with(&mut offset, ctx)?;
 
                     Self::JumpingSumo(js_class)
                 }
-                // 2 => Self::Minidrone,
                 // 4 => Self::SkyController,
                 // 8 => Self::PowerUp,
                 // 133 => Self::Generic,
@@ -116,7 +115,10 @@ pub mod scroll_impl {
                 unknown_feature => {
                     let mut feature_data = [0_u8; 256];
                     let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
+
                     assert_eq!(actual_written, feature_data[..actual_written].len());
+
+
                     offset += actual_written;
 
                     Self::Unknown {

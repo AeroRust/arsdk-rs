@@ -180,7 +180,7 @@ pub mod impl_scroll {
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
-            let mut actual_buf_len: usize = 0;
+            let mut actual_buf_len = 0;
 
             let frame_type = src.gread_with(&mut actual_buf_len, endian)?;
             let buffer_id = src.gread_with(&mut actual_buf_len, endian)?;
@@ -189,6 +189,7 @@ pub mod impl_scroll {
 
             let feature = if buf_len > 7 {
                 let feature = src.gread_with::<Feature>(&mut actual_buf_len, endian)?;
+
                 Some(feature)
             } else {
                 None
@@ -320,7 +321,6 @@ pub mod impl_scroll {
 mod frame_tests {
     use super::*;
     use crate::{
-        command::Feature,
         common::{self, Class as CommonClass},
         jumping_sumo::*,
     };
@@ -351,54 +351,6 @@ mod frame_tests {
         };
 
         assert_frames_match(&message, frame)
-    }
-
-    #[test]
-    #[ignore]
-    /// @TODO: Check what the hell is happening with test
-    // Are we missing bytes?
-    fn test_frame_is_it_incomplete() {
-        //                     DATA DCNavdata seq  [       22?      ] ArDr3 Landing
-        let message: [u8; 22] = [
-            0x2, 0x7f, 0x16, 0x17, 0x0, 0x0, 0x0, 0x1, // DATA
-            0x4, 0x6, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2f, 0xd3, 0xc5,
-        ];
-
-        let mut read_bytes = 0;
-        let frame: Frame = message
-            .gread_with(&mut read_bytes, LE)
-            .expect("Should read all bytes");
-
-        assert_eq!(message.len(), read_bytes);
-
-        match frame.feature {
-            Some(Feature::Unknown { feature, data }) => {
-                assert_eq!(message[7], feature);
-                assert_eq!(message[8..].to_vec(), data);
-            }
-            _ => panic!("Whoopsy, we should get an unknown frame here!"),
-        }
-    }
-
-    #[test]
-    fn test_simulator_frame() {
-        // Received: 12 bytes from 10.202.0.1:37789
-        // Unknown Frame: Expected 12 bytes, got 13
-        // Bytes: 4 126 1 12 0 0 0 1 31 0 0 12
-        // ArDrone3 = 1
-        let message: [u8; 12] = [4, 126, 1, 12, 0, 0, 0, 1, 31, 0, 0, 12];
-
-        let frame = Frame {
-            frame_type: Type::DataWithAck,
-            buffer_id: BufferID::DCEvent,
-            sequence_id: 1,
-            feature: Some(Feature::Unknown {
-                data: [31, 0, 0, 12].to_vec(),
-                feature: 1,
-            }),
-        };
-
-        assert_frames_match(&message, frame);
     }
 
     #[test]
