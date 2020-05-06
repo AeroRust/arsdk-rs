@@ -111,23 +111,23 @@ impl Into<u8> for Common {
 
 pub mod scroll_impl {
     use super::*;
-    use crate::MessageError;
+    use crate::frame::Error;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+            let class = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => Self::Network,
                 1 => Self::NetworkEvent,
                 2 => Self::Settings,
                 3 => Self::SettingsState,
                 4 => {
-                    let common = src.gread_with(&mut offset, endian)?;
+                    let common = src.gread_with(&mut offset, ctx)?;
 
                     Self::Common(common)
                 }
@@ -161,7 +161,7 @@ pub mod scroll_impl {
                 32 => Self::FlightPlanSettings,
                 33 => Self::FlightPlanSettingsState,
                 value => {
-                    return Err(MessageError::OutOfBound {
+                    return Err(Error::OutOfBound {
                         value: value.into(),
                         param: "Class".to_string(),
                     })
@@ -173,7 +173,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Class {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -191,13 +191,13 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Common {
-        type Error = MessageError;
+        type Error = Error;
 
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             use Common::*;
             let mut offset = 0;
 
-            let common = match src.gread_with::<u8>(&mut offset, endian)? {
+            let common = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => AllStates,
                 // @TODO: FIX THIS!
                 1 => CurrentDate(Utc::now()),
@@ -205,7 +205,7 @@ pub mod scroll_impl {
                 2 => CurrentTime(Utc::now()),
                 3 => Reboot,
                 value => {
-                    return Err(MessageError::OutOfBound {
+                    return Err(Error::OutOfBound {
                         value: value.into(),
                         param: "Common".to_string(),
                     })
@@ -217,7 +217,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Common {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;

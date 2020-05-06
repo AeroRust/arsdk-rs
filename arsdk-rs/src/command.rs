@@ -64,15 +64,16 @@ impl Into<u8> for &Feature {
 
 pub mod scroll_impl {
     use super::*;
-    use crate::MessageError;
+    use crate::frame::Error;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Feature {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
+
             let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
                 // 0 => {
                 //     let common = src.gread_with(&mut offset, ctx)?;
@@ -81,7 +82,9 @@ pub mod scroll_impl {
                 // }
                 1 => {
                     let ardrone3 = if !src[offset..].is_empty() {
-                        Some(src.gread_with::<ArDrone3>(&mut offset, ctx)?)
+                        let ardrone3 = src.gread_with::<ArDrone3>(&mut offset, ctx)?;
+
+                        Some(ardrone3)
                     } else {
                         None
                     };
@@ -136,7 +139,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Feature {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -172,13 +175,17 @@ pub mod scroll_impl {
 #[cfg(test)]
 mod command_tests {
     use super::*;
+
     #[test]
     fn test_feature() {
         assert_feature(
             Feature::Common(common::Class::Common(common::Common::AllStates)),
             0,
         );
-        assert_feature(Feature::ArDrone3(Piloting::TakeOff), 1);
+        assert_feature(
+            Feature::ArDrone3(Some(ArDrone3::Piloting(crate::ardrone3::Piloting::TakeOff))),
+            1,
+        );
         assert_feature(Feature::Minidrone, 2);
         assert_feature(
             Feature::JumpingSumo(jumping_sumo::Class::Piloting(

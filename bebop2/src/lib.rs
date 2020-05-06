@@ -29,7 +29,7 @@ impl Bebop2 {
     }
 
     /// - Captain #Ferris 🦀 :Take off... 🛫
-    pub fn take_off(&self) -> AnyResult<()> {
+    pub fn take_off(&self) -> Result<(), Error> {
         let feature = Feature::ArDrone3(Some(ArDrone3::Piloting(Piloting::TakeOff)));
 
         let frame = Frame::for_drone(
@@ -42,7 +42,7 @@ impl Bebop2 {
         self.drone.send_frame(frame)
     }
 
-    pub fn landing(&self) -> AnyResult<()> {
+    pub fn landing(&self) -> Result<(), Error> {
         let feature = Feature::ArDrone3(Some(ArDrone3::Piloting(Piloting::Landing)));
 
         let frame = Frame::for_drone(

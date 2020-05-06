@@ -1,6 +1,37 @@
 use crate::{command, Drone};
 use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use std::convert::TryFrom;
+use std::fmt;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Message parsing error")]
+    Scroll(#[from] scroll::Error),
+    #[error("Out of bound value {value} for {param}")]
+    OutOfBound {
+        // TODO: See how should we handle this for each individual case
+        // Use the largest possible value
+        value: u64,
+        param: String,
+    },
+    #[error("Expected {expected} bytes, got {actual}")]
+    BytesLength { expected: u32, actual: u32 },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FrameType {
+    Known(Frame),
+    Unknown(UnknownFrame),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Unknown Frame
+pub struct UnknownFrame {
+    key: String,
+    value: u64,
+    data: Vec<u8>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
@@ -49,6 +80,21 @@ pub enum Type {
     LowLatency = 3,    // ARNETWORKAL_FRAME_TYPE_DATA_LOW_LATENCY 3
     DataWithAck = 4,   // ARNETWORKAL_FRAME_TYPE_DATA_WITH_ACK 4
     Max = 5,           // ARNETWORKAL_FRAME_TYPE_MAX 5
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Type::")?;
+
+        match self {
+            Self::Uninitialized => write!(f, "Uninitialized"),
+            Self::Ack => write!(f, "Ack"),
+            Self::Data => write!(f, "Data"),
+            Self::LowLatency => write!(f, "LowLatency"),
+            Self::DataWithAck => write!(f, "DataWithAck"),
+            Self::Max => write!(f, "Max"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -177,31 +223,79 @@ impl Into<u8> for BufferID {
     }
 }
 
+impl fmt::Display for BufferID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BufferID::")?;
+
+        match self {
+            Self::PING => write!(f, "PING"),
+            Self::PONG => write!(f, "PONG"),
+            Self::CDNonAck => write!(f, "CDNonAck"),
+            Self::CDAck => write!(f, "CDAck"),
+            Self::CDEmergency => write!(f, "CDEmergency"),
+            Self::CDVideoAck => write!(f, "CDVideoAck"),
+            Self::DCVideo => write!(f, "DCVideo"),
+            Self::DCEvent => write!(f, "DCEvent"),
+            Self::DCNavdata => write!(f, "DCNavdata"),
+            Self::ACKFromSendWithAck => write!(f, "ACKFromSendWithAck"),
+        }
+    }
+}
+
 pub mod impl_scroll {
     use super::*;
-    use crate::{command::Feature, MessageError};
+    use crate::command::Feature;
 
     use scroll::{ctx, Endian, Pread, Pwrite};
 
-    impl<'a> ctx::TryFromCtx<'a, Endian> for Frame {
-        type Error = MessageError;
+    impl<'a> ctx::TryFromCtx<'a, Endian> for FrameType {
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut actual_buf_len = 0;
 
-            let frame_type = src.gread_with(&mut actual_buf_len, endian)?;
-            let buffer_id = src.gread_with(&mut actual_buf_len, endian)?;
-            let sequence_id = src.gread_with(&mut actual_buf_len, endian)?;
-            let buf_len: u32 = src.gread_with(&mut actual_buf_len, endian)?;
+            match src.gread_with(&mut actual_buf_len, ctx) {
+                Ok(frame) => Ok((FrameType::Known(frame), actual_buf_len)),
+                Err(Error::OutOfBound { param, value }) => {
+                    let mut data = [0_u8; 256];
+                    let actual_written = data.gwrite_with(&src[actual_buf_len..], &mut 0, ())?;
+
+                    assert_eq!(actual_written, data[..actual_written].len());
+
+                    actual_buf_len += actual_written;
+                    let unknown_frame = FrameType::Unknown(UnknownFrame {
+                        key: param,
+                        value,
+                        data: data[..actual_written].to_vec(),
+                    });
+                    Ok((unknown_frame, actual_buf_len))
+                }
+                Err(err) => Err(err),
+            }
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for Frame {
+        type Error = Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut actual_buf_len = 0;
+            let frame_type = src.gread_with(&mut actual_buf_len, ctx)?;
+            let buffer_id = src.gread_with(&mut actual_buf_len, ctx)?;
+            let sequence_id = src.gread_with(&mut actual_buf_len, ctx)?;
+            let buf_len: u32 = src.gread_with(&mut actual_buf_len, ctx)?;
+
             // TODO: Fix this as it might fail, use TryFrom<u32>
             let buf_len_usize = buf_len as usize;
 
             let feature = if buf_len > 7 {
                 // we can receive multiple frames, so the feature should be limited
                 // to buf_len from source
+
                 let feature =
-                    src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, endian)?;
+                    src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, ctx)?;
 
                 Some(feature)
             } else {
@@ -209,27 +303,27 @@ pub mod impl_scroll {
             };
 
             if buf_len_usize != actual_buf_len {
-                return Err(Self::Error::BytesLength {
+                Err(Error::BytesLength {
                     expected: buf_len,
                     // @TODO: actual_buf_len as u32 can fail (TryFrom is impled for usize)
                     actual: actual_buf_len as u32,
-                });
+                })
+            } else {
+                Ok((
+                    Frame {
+                        frame_type,
+                        buffer_id,
+                        sequence_id,
+                        feature,
+                    },
+                    actual_buf_len,
+                ))
             }
-
-            Ok((
-                Frame {
-                    frame_type,
-                    buffer_id,
-                    sequence_id,
-                    feature,
-                },
-                actual_buf_len,
-            ))
         }
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Frame {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -247,7 +341,6 @@ pub mod impl_scroll {
             };
 
             // 7 bytes + feature_length bytes = buf.length
-            // let written = 7 + feature_length;
             this.pwrite_with::<u32>(offset as u32, buf_length_offset, ctx)?;
 
             Ok(offset)
@@ -255,10 +348,10 @@ pub mod impl_scroll {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Type {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], _endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], _ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
             let frame_value = src.gread::<u8>(&mut offset)?;
 
@@ -270,7 +363,7 @@ pub mod impl_scroll {
                 4 => Self::DataWithAck,
                 5 => Self::Max,
                 value => {
-                    return Err(MessageError::OutOfBound {
+                    return Err(Error::OutOfBound {
                         value: value.into(),
                         param: "Type".to_string(),
                     })
@@ -282,7 +375,7 @@ pub mod impl_scroll {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Type {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             Ok(this.pwrite_with::<u8>(self.into(), 0, ctx)?)
@@ -290,7 +383,7 @@ pub mod impl_scroll {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for BufferID {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], _ctx: Endian) -> Result<(Self, usize), Self::Error> {
@@ -309,7 +402,7 @@ pub mod impl_scroll {
                 127 => Self::DCNavdata,
                 139 => Self::ACKFromSendWithAck,
                 value => {
-                    return Err(MessageError::OutOfBound {
+                    return Err(Error::OutOfBound {
                         value: value.into(),
                         param: "BufferID".to_string(),
                     })
@@ -321,7 +414,7 @@ pub mod impl_scroll {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for BufferID {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             Ok(this.pwrite_with::<u8>(self.into(), 0, ctx)?)

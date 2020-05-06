@@ -116,18 +116,21 @@ pub enum Piloting {
 
 pub mod scroll_impl {
     use super::*;
-    use crate::MessageError;
+    use crate::frame::Error;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for ArDrone3 {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
-
             let ardrone3 = match src.gread_with::<u8>(&mut offset, ctx)? {
-                0 => Self::Piloting(src.gread_with(&mut offset, ctx)?),
+                0 => {
+                    let piloting = src.gread_with::<Piloting>(&mut offset, ctx)?;
+
+                    Self::Piloting(piloting)
+                }
                 // 1 => Self::Camera,
                 // 2 => Self::PilotingSettings,
                 // 3 => Self::MediaRecordEvent,
@@ -184,7 +187,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for ArDrone3 {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -203,7 +206,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Piloting {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
@@ -227,7 +230,7 @@ pub mod scroll_impl {
                 12 => StartPilotedPOI,
                 13 => StopPilotedPOI,
                 value => {
-                    return Err(MessageError::OutOfBound {
+                    return Err(Error::OutOfBound {
                         value: value.into(),
                         param: "Piloting".to_string(),
                     })
@@ -239,7 +242,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Piloting {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             Ok(this.pwrite_with::<u16>(self as u16, 0, ctx)?)
