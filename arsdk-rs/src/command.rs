@@ -22,6 +22,9 @@ pub enum Feature {
     ThermalCam,                       // ARCOMMANDS_ID_FEATURE_THERMAL_CAM = 142,
     Animation,                        // ARCOMMANDS_ID_FEATURE_ANIMATION = 144,
     SequoiaCam,                       // ARCOMMANDS_ID_FEATURE_SEQUOIA_CAM = 147,
+    /// UNKOWN 149 from anafi4k
+    /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 14, feature: Some(Unknown { feature: 149, data: [0, 3, 0, 91, 33] }) }
+
     /// Temporary Enum for storing unknown Features:
     /// TODO: REMOVE!
     Unknown {
@@ -77,7 +80,6 @@ pub mod scroll_impl {
             let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
                 // 0 => {
                 //     let common = src.gread_with(&mut offset, ctx)?;
-
                 //     Self::Common(common)
                 // }
                 1 => {

@@ -8,11 +8,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let drone = Bebop2::connect(PARROT_SPHINX_CONFIG)?;
 
+    // std::thread::sleep(std::time::Duration::from_ses(1));
     tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
-
     drone.take_off()?;
-    // tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
-    // drone.landing()?;
+
+    tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+    for i in 0..20 {
+        drone.up(i)?;
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
+    drone.landing()?;
 
     loop {
         // loop endlessly

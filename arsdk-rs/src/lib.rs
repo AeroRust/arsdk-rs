@@ -11,6 +11,9 @@ use std::sync::{
 };
 use thiserror::Error;
 
+// re-export chrono
+pub use chrono;
+
 pub const INIT_PORT: u16 = 44444;
 pub const LISTEN_PORT: u16 = 43210;
 pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
@@ -34,6 +37,7 @@ pub mod prelude {
     pub use crate::{
         frame, Config, ConnectionError, Drone, Error, PARROT_SPHINX_CONFIG, PARROT_SPHINX_IP,
     };
+    pub use chrono::{DateTime, Utc};
 }
 
 #[derive(Debug, Error)]
