@@ -24,6 +24,10 @@ pub enum Feature {
     SequoiaCam,                       // ARCOMMANDS_ID_FEATURE_SEQUOIA_CAM = 147,
     /// UNKOWN 149 from anafi4k
     /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 14, feature: Some(Unknown { feature: 149, data: [0, 3, 0, 91, 33] }) }
+    /// Unknow 148 from anafi4k
+    /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 5, feature: Some(Unknown { feature: 148, data: [0, 6, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 223, 46, 229, 182, 0, 0, 0, 0, 0, 0, 0, 0, 222, 4, 180, 66, 0, 0, 0, 128, 0, 0, 0, 0] }) }
+    /// Unknow 143 from anafi4k
+    /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 4, feature: Some(Unknown { feature: 143, data: [0, 22, 0, 0, 0, 0, 128, 63] }) }
 
     /// Temporary Enum for storing unknown Features:
     /// TODO: REMOVE!
@@ -78,10 +82,10 @@ pub mod scroll_impl {
             let mut offset = 0;
 
             let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
-                // 0 => {
-                //     let common = src.gread_with(&mut offset, ctx)?;
-                //     Self::Common(common)
-                // }
+                0 => {
+                    let common = src.gread_with(&mut offset, ctx)?;
+                    Self::Common(common)
+                }
                 1 => {
                     let ardrone3 = if !src[offset..].is_empty() {
                         let ardrone3 = src.gread_with::<ArDrone3>(&mut offset, ctx)?;

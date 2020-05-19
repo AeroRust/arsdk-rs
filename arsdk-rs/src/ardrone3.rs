@@ -39,9 +39,32 @@ pub enum ArDrone3 {
     PictureSettings,
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_PICTURESETTINGSSTATE = 20
     PictureSettingsState,
+
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_MEDIASTREAMING = 21
-    MediaStreaming,
+    MediaStreaming(MediaStreaming),
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_MEDIASTREAMINGSTATE = 22
+    ///
+    /// TODO: More info on this command
+    /// On how to start the video stream, look at:
+    /// arsdk-native/packages/libARController/Sources/ARCONTROLLER_Stream.c:219
+    ///
+    /// Possible values:
+    /// - ARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED_ENABLED
+    ///     Starts stream
+    /// - ARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED_DISABLED
+    ///
+    /// ```c
+    /// /**
+    ///  * @brief Current video streaming status.
+    ///  */
+    /// typedef enum
+    /// {
+    ///     ARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED_ENABLED = 0,    ///< Video streaming is enabled.
+    ///     ARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED_DISABLED = 1,    ///< Video streaming is disabled.
+    ///     ARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED_ERROR = 2,    ///< Video streaming failed to start.
+    ///     ARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED_MAX
+    /// } eARCOMMANDS_ARDRONE3_MEDIASTREAMINGSTATE_VIDEOENABLECHANGED_ENABLED;
+    /// ```
     MediaStreamingState,
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_GPSSETTINGS = 23
     GPSSettings,
@@ -99,6 +122,26 @@ pub enum ArDrone3 {
     },
 }
 
+
+/// From pyparrot:
+/// For commands reference see (pyparrot/commandsandsensors/ardrone3.xml#L2965-L3008)[https://github.com/amymcgovern/pyparrot/blob/8b7091cdf9a411938566abd7962b05ef7df7adb3/pyparrot/commandsandsensors/ardrone3.xml#L2965-L3008]
+///
+/// For EnableVideo see (pyparrot/Bebop.py#L448-L461)[https://github.com/amymcgovern/pyparrot/blob/bf4775ec1199b282e4edde1e4a8e018dcc8725e0/pyparrot/Bebop.py#L448-L461]
+///
+/// ```python
+/// command_tuple = self.command_parser.get_command_tuple("ardrone3", "MediaStreaming", "VideoEnable")
+/// param_tuple = [1] # Enable
+/// param_type_tuple = ['u8']
+/// self.drone_connection.send_param_command_packet(command_tuple,param_tuple,param_type_tuple)
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MediaStreaming {
+    /// EnableVideo = 0
+    /// bool: u8
+    EnableVideo(bool),
+    // TODO: VideoStreamMode
+}
+
 /// u16
 /// TODO: Impl (de)serialization
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -150,6 +193,8 @@ pub enum Piloting {
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_LANDING = 3
     Landing,
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_EMERGENCY = 4
+    /// Frame { frame_type: DataWithAck, buffer_id: DCEvent, sequence_id: 0,
+    /// feature: Some(ArDrone3(Some(Unknown { ardrone3: 4, data: [1, 0, 0, 0, 0, 0] }))) }
     Emergency,
     /// ARCOMMANDS_ID_ARDRONE3_PILOTING_CMD_NAVIGATEHOME = 5
     /// requires: uint8_t _start
@@ -294,6 +339,13 @@ pub mod scroll_impl {
 
                     this.gwrite_with(piloting, &mut offset, ctx)?;
                 }
+                Self::MediaStreaming(streaming) => match streaming {
+                    MediaStreaming::EnableVideo(enabled) => {
+                        this.gwrite_with::<u8>(31, &mut offset, ctx)?;
+                        this.gwrite_with::<u8>(enabled.into(), &mut offset, ctx)?;
+                    }
+                    _ => unimplemented!("Not all MediaStreaming options are impled!"),
+                },
                 _ => unimplemented!("Not all ArDrone3 Classes are impled!"),
             }
 

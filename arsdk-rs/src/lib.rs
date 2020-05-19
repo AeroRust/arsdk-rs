@@ -1,7 +1,7 @@
 use crate::frame::{Frame, FrameType};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use log::{debug, info};
+use log::{debug, info, error};
 use pnet::datalink;
 use scroll::{ctx::TryIntoCtx, Pread, LE};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -180,7 +180,8 @@ impl DroneInner {
     pub(crate) fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
         if let Some(mut sequence_id) = self.sequence_ids.get_mut(&buffer_id) {
             let command_id = *sequence_id;
-            *sequence_id += 1;
+            *sequence_id = sequence_id.overflowing_add(1).0;
+
             command_id
         } else {
             self.sequence_ids.insert(buffer_id, 1);
@@ -237,7 +238,15 @@ fn spawn_cmd_sender(
     })?;
 
     std::thread::spawn(move || loop {
-        let frame_to_send = rx.recv().expect("couldn't receive frame.");
+        let frame_to_send = match rx.recv() {
+            Ok(frame) => frame,
+            Err(err) => {
+                error!("Receiving Frame for sending failed: {:?}", &err);
+                continue;
+            },
+        };
+
+        info!("Frame to sent: {:?}", &frame_to_send);
 
         let frame = frame_to_send.pread_with::<Frame>(0, LE);
 
