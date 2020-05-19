@@ -1,9 +1,9 @@
-use std::error::Error;
 use log::info;
+use std::error::Error;
 
 use bebop2::prelude::*;
-use tokio::time::delay_for;
 use std::time::Duration;
+use tokio::time::delay_for;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -37,7 +37,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
         delay_for(Duration::from_millis(25)).await;
     }
 
-    loop {
-
-    }
+    loop {}
 }

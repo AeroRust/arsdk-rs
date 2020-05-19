@@ -1,7 +1,7 @@
 use crate::frame::{Frame, FrameType};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use log::{debug, info, error};
+use log::{debug, error, info};
 use pnet::datalink;
 use scroll::{ctx::TryIntoCtx, Pread, LE};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -243,7 +243,7 @@ fn spawn_cmd_sender(
             Err(err) => {
                 error!("Receiving Frame for sending failed: {:?}", &err);
                 continue;
-            },
+            }
         };
 
         info!("Frame to sent: {:?}", &frame_to_send);

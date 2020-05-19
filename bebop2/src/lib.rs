@@ -4,7 +4,7 @@ use arsdk_rs::{
 };
 
 pub use arsdk_rs::{
-    ardrone3::{ArDrone3, Piloting, PCMD, MediaStreaming},
+    ardrone3::{ArDrone3, MediaStreaming, Piloting, PCMD},
     prelude::*,
 };
 

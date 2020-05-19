@@ -122,7 +122,6 @@ pub enum ArDrone3 {
     },
 }
 
-
 /// From pyparrot:
 /// For commands reference see (pyparrot/commandsandsensors/ardrone3.xml#L2965-L3008)[https://github.com/amymcgovern/pyparrot/blob/8b7091cdf9a411938566abd7962b05ef7df7adb3/pyparrot/commandsandsensors/ardrone3.xml#L2965-L3008]
 ///
@@ -343,8 +342,7 @@ pub mod scroll_impl {
                     MediaStreaming::EnableVideo(enabled) => {
                         this.gwrite_with::<u8>(31, &mut offset, ctx)?;
                         this.gwrite_with::<u8>(enabled.into(), &mut offset, ctx)?;
-                    }
-                    _ => unimplemented!("Not all MediaStreaming options are impled!"),
+                    } // _ => unimplemented!("Not all MediaStreaming options are impled!"),
                 },
                 _ => unimplemented!("Not all ArDrone3 Classes are impled!"),
             }

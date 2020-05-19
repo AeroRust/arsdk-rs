@@ -85,7 +85,7 @@ pub enum Type {
     /// ARNETWORKAL_FRAME_TYPE_DATA_WITH_ACK 4
     DataWithAck = 4,
     /// ARNETWORKAL_FRAME_TYPE_MAX 5
-    Max = 5,           
+    Max = 5,
 }
 
 impl fmt::Display for Type {
@@ -492,16 +492,11 @@ mod frame_tests {
     // #[ignore]
     fn test_common_time_command() {
         let message: [u8; 15] = [
-            0x4, 0xb, 0x2, 0x15, 0x0, 0x0, 0x0,
-            // Feature::Commont
-            0x0,
-            // common::Class::Common
-            0x4,
-            // Current time
-            0x2,
-            // 12 bytes incl nul
-            0x0, 0x54, 0x31, 0x35, 0x30, 0x36, 0x31,
-            0x31, 0x30, 0x30, 0x30, 0x0,
+            0x4, 0xb, 0x2, 0x15, 0x0, 0x0, 0x0, // Feature::Commont
+            0x0, // common::Class::Common
+            0x4, // Current time
+            0x2, // 12 bytes incl nul
+            0x0, 0x54, 0x31, 0x35, 0x30, 0x36, 0x31, 0x31, 0x30, 0x30, 0x30, 0x0,
         ];
 
         let date = Utc.ymd(2020, 04, 26).and_hms(15, 06, 11);

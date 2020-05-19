@@ -4,11 +4,11 @@ use std::ffi::CString;
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 /// u8
 pub enum Class {
-    Network,                 // ARCOMMANDS_ID_COMMON_CLASS_NETWORK = 0,
-    NetworkEvent,            // ARCOMMANDS_ID_COMMON_CLASS_NETWORKEVENT = 1,
-    Settings,                // ARCOMMANDS_ID_COMMON_CLASS_SETTINGS = 2,
-    SettingsState,           // ARCOMMANDS_ID_COMMON_CLASS_SETTINGSSTATE = 3,
-    Common(Common),          // ARCOMMANDS_ID_COMMON_CLASS_COMMON = 4,
+    Network,        // ARCOMMANDS_ID_COMMON_CLASS_NETWORK = 0,
+    NetworkEvent,   // ARCOMMANDS_ID_COMMON_CLASS_NETWORKEVENT = 1,
+    Settings,       // ARCOMMANDS_ID_COMMON_CLASS_SETTINGS = 2,
+    SettingsState,  // ARCOMMANDS_ID_COMMON_CLASS_SETTINGSSTATE = 3,
+    Common(Common), // ARCOMMANDS_ID_COMMON_CLASS_COMMON = 4,
     /// ARCOMMANDS_ID_COMMON_CLASS_COMMONSTATE = 5,
     ///
     /// Bytes: 2 127 0 [12 0 0 0] [0] [5] [1 0] 100
@@ -82,7 +82,6 @@ fn format_date(date: &DateTime<Utc>) -> CString {
     let format = date.format("%Y-%m-%d").to_string();
 
     CString::new(format.as_bytes()).expect("CString::new failed with formated date")
-
 }
 // "’T’HHmmssZZZ"forCommon.Common.CurrentTime. Ex:T101527+0200.
 fn format_time(time: &DateTime<Utc>) -> CString {

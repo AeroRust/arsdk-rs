@@ -1,4 +1,4 @@
-use log::{info, error};
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use serde_with::with_prefix;
 use std::{
@@ -36,7 +36,6 @@ pub struct Response {
     pub status: i8,
     // @TODO: qos_mode: bool maybe?!
 }
-
 
 with_prefix!(prefix_arstream2_client "arstream2_client_");
 with_prefix!(prefix_arstream2_server "arstream2_server_");
