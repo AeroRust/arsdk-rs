@@ -19,6 +19,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "anafi-rs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arsdk-rs",
+ "env_logger",
+ "log 0.4.8",
+ "tokio",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
