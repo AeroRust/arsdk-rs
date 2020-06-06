@@ -108,25 +108,25 @@ impl Into<u16> for PilotingID {
 }
 pub mod scroll_impl {
     use super::*;
-    use crate::MessageError;
+    use crate::frame::Error;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Class {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let class = match src.gread_with::<u8>(&mut offset, endian)? {
+            let class = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => {
-                    let pilot_state = src.gread_with(&mut offset, endian)?;
+                    let pilot_state = src.gread_with(&mut offset, ctx)?;
 
                     Self::Piloting(pilot_state)
                 }
                 1 => Self::PilotingState,
                 2 => {
-                    let anim = src.gread_with(&mut offset, endian)?;
+                    let anim = src.gread_with(&mut offset, ctx)?;
 
                     Self::Animations(anim)
                 }
@@ -162,7 +162,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Class {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -183,15 +183,15 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for PilotingID {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let piloting_id = match src.gread_with::<u16>(&mut offset, endian)? {
+            let piloting_id = match src.gread_with::<u16>(&mut offset, ctx)? {
                 0 => {
-                    let pilot_state = src.gread_with(&mut offset, endian)?;
+                    let pilot_state = src.gread_with(&mut offset, ctx)?;
 
                     Self::Pilot(pilot_state)
                 }
@@ -210,7 +210,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for PilotingID {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -228,13 +228,13 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for PilotState {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let flag = match src.gread_with::<u8>(&mut offset, endian)? {
+            let flag = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => false,
                 1 => true,
                 // @TODO: should we mention that it is for PilotState as well and how?
@@ -245,8 +245,8 @@ pub mod scroll_impl {
                     })
                 }
             };
-            let speed: i8 = src.gread_with(&mut offset, endian)?;
-            let turn: i8 = src.gread_with(&mut offset, endian)?;
+            let speed: i8 = src.gread_with(&mut offset, ctx)?;
+            let turn: i8 = src.gread_with(&mut offset, ctx)?;
 
             let pilot_state = PilotState { flag, speed, turn };
 
@@ -255,7 +255,7 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for PilotState {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
@@ -268,13 +268,13 @@ pub mod scroll_impl {
     }
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Anim {
-        type Error = MessageError;
+        type Error = Error;
 
         // and the lifetime annotation on `&'a [u8]` here
-        fn try_from_ctx(src: &'a [u8], endian: Endian) -> Result<(Self, usize), Self::Error> {
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            let anim = match src.gread_with::<u8>(&mut offset, endian)? {
+            let anim = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => Self::JumpStop,
                 1 => Self::JumpCancel,
                 2 => Self::JumpLoad,
@@ -289,14 +289,14 @@ pub mod scroll_impl {
             };
 
             let mut anim_data = [0_u8; 5];
-            src.gread_inout_with(&mut offset, &mut anim_data, endian)?;
+            src.gread_inout_with(&mut offset, &mut anim_data, ctx)?;
 
             Ok((anim, offset))
         }
     }
 
     impl<'a> ctx::TryIntoCtx<Endian> for Anim {
-        type Error = MessageError;
+        type Error = Error;
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset: usize = 0;

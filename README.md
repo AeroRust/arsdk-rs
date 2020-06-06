@@ -62,6 +62,14 @@ fn main() {
 }
 ```
 
+### Video stream:
+
+Based on [pyparrot](https://github.com/amymcgovern/pyparrot/blob/bf4775ec1199b282e4edde1e4a8e018dcc8725e0/pyparrot/DroneVision.py#L78) pointing to the [forum](http://forum.developer.parrot.com/t/streaming-address-of-mambo-fpv-for-videoprojection/6442/6).
+NOTE: It doesn't currently work.
+
+Bebop2 (double check): rtsp://10.202.0.1/media/stream2
+Anafi4k: rtsp://10.202.0.1/live
+
 ### Telemetery
 
 Documetation:
