@@ -77,6 +77,18 @@ pub struct Config {
     pub send_datetime: bool,
 }
 
+impl<I> From<I> for Config
+where
+    I: Into<IpAddr>,
+{
+    fn from(ip: I) -> Self {
+        Self {
+            drone_addr: ip.into(),
+            send_datetime: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Drone {
     inner: Arc<DroneInner>,

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::with_prefix;
 use std::{
     io::{Read, Write},
-    net::{SocketAddr, TcpStream},
+    net::{Shutdown, SocketAddr, TcpStream},
 };
 use thiserror::Error;
 
@@ -68,7 +68,7 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
 
     info!("Connecting controller {}", request.controller_name);
 
-    let mut handshake_stream = retry(10, target).ok_or_else(|| Error::Retry { target })?;
+    let mut handshake_stream = retry(10, target)?;
 
     let request_string = serde_json::to_string(&request)?;
 
@@ -77,6 +77,8 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
     let mut response_string = String::new();
     handshake_stream.read_to_string(&mut response_string)?;
     let response_string = response_string.trim_end_matches('\u{0}');
+
+    handshake_stream.shutdown(Shutdown::Both)?;
 
     let response: Response = serde_json::from_str(&response_string)?;
 
@@ -87,14 +89,15 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
     }
 }
 
-fn retry(times: usize, target: SocketAddr) -> Option<TcpStream> {
+fn retry(times: usize, target: SocketAddr) -> Result<TcpStream, Error> {
     let timeout = std::time::Duration::from_secs(2);
-    for retry_time in 0..times {
-        match TcpStream::connect_timeout(&target, timeout) {
-            Ok(stream) => return Some(stream),
-            Err(err) => error!("Error connecting to Tcp ({}): {}", retry_time, err),
-        };
-    }
+    let mut retry = 0;
 
-    None
+    let mut res = TcpStream::connect_timeout(&target, timeout);
+
+    while !res.is_ok() && retry < times {
+        retry += 1;
+        res = TcpStream::connect_timeout(&target, timeout);
+    }
+    res.map_err(std::convert::Into::into)
 }
