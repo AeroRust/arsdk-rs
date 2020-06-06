@@ -26,7 +26,7 @@ checksum = "d9a60d744a80c30fcb657dfe2c1b22bcb3e814c1a1e3674f32bf5820b570fbff"
 
 [[package]]
 name = "arsdk-rs"
-version = "0.0.4"
+version = "0.0.5"
 dependencies = [
  "anyhow",
  "chrono",
@@ -149,7 +149,7 @@ checksum = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
 
 [[package]]
 name = "jumpingsumo-rs"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "arsdk-rs",
