@@ -1,6 +1,6 @@
 [package]
 name = "arsdk-rs"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
 edition = "2018"
 description = "parrot arsdk in rust"
