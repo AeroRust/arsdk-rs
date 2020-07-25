@@ -9,18 +9,18 @@ pub use arsdk_rs::{
 };
 
 pub mod prelude {
-    pub use crate::Bebop2;
+    pub use crate::Anafi;
     pub use arsdk_rs::{
         ardrone3::{ArDrone3, Piloting, PCMD},
         prelude::*,
     };
 }
 
-pub struct Bebop2 {
+pub struct Anafi {
     drone: Drone,
 }
 
-impl Bebop2 {
+impl Anafi {
     pub fn connect(config: Config) -> Result<Self, ConnectionError> {
         let drone = Drone::connect(config)?;
 
