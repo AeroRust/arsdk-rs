@@ -38,6 +38,11 @@ pub struct Frame {
     pub frame_type: Type,
     pub buffer_id: BufferID,
     pub sequence_id: u8,
+    /// Example of empty feature:
+    /// ```
+    /// [2020-07-25T18:51:13Z DEBUG arsdk_rs] Bytes: 1 139 0 8 0 0 0 1
+    /// [2020-07-25T18:51:13Z INFO  arsdk_rs::parse] Frame: Frame { frame_type: Ack, buffer_id: ACKFromSendWithAck, sequence_id: 0, feature: Some(ArDrone3(None)) }
+    /// ```
     pub feature: Option<command::Feature>,
 }
 
@@ -549,6 +554,43 @@ mod frame_tests {
             buffer_id: BufferID::CDAck,
             sequence_id: 1,
             feature: Some(command::Feature::JumpingSumo(Class::Animations(Anim::Jump))),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
+    #[test]
+    fn test_ping_feature_from_anafi4k() {
+        let message: [u8; 15] = [2, 0, 2, 15, 0, 0, 0, 155, 216, 221, 13, 0, 0, 0, 0];
+        let frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::PING,
+            sequence_id: 2,
+            feature: Some(command::Feature::Unknown {
+                feature: 155,
+                data: vec![216, 221, 13, 0, 0, 0, 0],
+            }),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_common_state_anafi4k_frame() {
+        let message: [u8; 12] = [
+            2, 127, 20, 12, 0, 0, 0, // common
+            0, // Common State
+            5, //
+            1, 0, 100,
+        ];
+
+        let frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::DCNavdata,
+
+            sequence_id: 20,
+            feature: Some(command::Feature::Common()),
         };
 
         assert_frames_match(&message, frame);

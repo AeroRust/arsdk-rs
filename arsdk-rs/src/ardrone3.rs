@@ -11,6 +11,50 @@ pub enum ArDrone3 {
     PilotingSettings,
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_MEDIARECORDEVENT = 3
     MediaRecordEvent,
+    // # ONE:
+    // Frame { frame_type: DataWithAck, buffer_id: DCEvent, sequence_id: 0, feature: Some(ArDrone3(Some(Unknown { ardrone3: 4, data: [1, 0, 0, 0, 0, 0] }))) }
+    // u16 [1, 0] - LANDINGSTATECHANGED
+    // u32 [0, 0, 0, 0] -
+    // /**
+    //  * @brief Drone landing state
+    //  */
+    // typedef enum
+    // {
+    //     ARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE_LINEAR = 0,    ///< Linear landing
+    //     ARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE_SPIRAL = 1,    ///< Spiral landing
+    //     ARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE_MAX
+    // } eARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE;
+    //
+
+    // # TWO:
+    // Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 0, feature: Some(ArDrone3(Some(Unknown { ardrone3: 4, data: [5, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0] }))) }
+    // u16 [5, 0] - SPEEDCHANGED
+    // 3 x (4?) per float [0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0]
+    //
+    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddU16ToBuffer (buffer, ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_SPEEDCHANGED, currIndexInBuffer, buffLen);
+    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddFloatToBuffer (buffer, _speedX, currIndexInBuffer, buffLen);
+    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddFloatToBuffer (buffer, _speedY, currIndexInBuffer, buffLen);
+    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddFloatToBuffer (buffer, _speedZ, currIndexInBuffer, buffLen);
+    //
+    // typedef enum {
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_FLATTRIMCHANGED = 0,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_FLYINGSTATECHANGED = 1,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ALERTSTATECHANGED = 2,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_NAVIGATEHOMESTATECHANGED = 3,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_POSITIONCHANGED = 4,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_SPEEDCHANGED = 5,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ATTITUDECHANGED = 6,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_AUTOTAKEOFFMODECHANGED = 7,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ALTITUDECHANGED = 8,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_GPSLOCATIONCHANGED = 9,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_LANDINGSTATECHANGED = 10,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_AIRSPEEDCHANGED = 11,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_MOVETOCHANGED = 12,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_MOTIONSTATE = 13,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_PILOTEDPOI = 14,
+    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_RETURNHOMEBATTERYCAPACITY = 15,
+    // } eARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD;
+    //
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_PILOTINGSTATE = 4
     PilotingState,
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_ANIMATIONS = 5

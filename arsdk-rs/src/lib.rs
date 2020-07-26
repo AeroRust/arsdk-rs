@@ -105,7 +105,7 @@ impl Drone {
     /// Connects to a drone
     ///
     /// * Spawns Listener at LISTENER_PORT
-    /// * Perfroms Handshake at INIT_PORT
+    /// * Performs Handshake at INIT_PORT
     /// * Spawns Command sender at `c2d_port`
     pub fn connect(config: Config) -> Result<Self, ConnectionError> {
         let local_ip = local_ip(config.drone_addr)
@@ -122,14 +122,19 @@ impl Drone {
         };
 
         let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
+        info!("{}: Spawning Listener", &&local_listener);
+
         spawn_listener(drone.clone(), local_listener)?;
 
         let init_addr = SocketAddr::new(config.drone_addr, INIT_PORT);
-        let handshake_response = perform_handshake(init_addr, local_listener.port())?;
 
+        info!("Init address {}", &init_addr);
+
+        let handshake_response = perform_handshake(init_addr, local_listener.port())?;
         let cmd_sender_target = SocketAddr::new(config.drone_addr, handshake_response.c2d_port);
 
-        info!("spawning cmd sender on {}", cmd_sender_target);
+        info!("{}: Spawning CMD Sender", cmd_sender_target);
+
         spawn_cmd_sender(rx_cmd, local_ip, cmd_sender_target)?;
 
         if config.send_datetime {

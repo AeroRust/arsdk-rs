@@ -10,9 +10,8 @@ use scroll::{Pread, LE};
 /// - Logs unknown frames
 pub(crate) fn handle_bytes(drone: &Drone, raw_frames: &[u8]) {
     let frames = parse_message_frames(&raw_frames);
-    let received: Vec<_> = parse_message_frames(&raw_frames);
 
-    for result in received.iter() {
+    for result in frames.iter() {
         match result {
             Ok(FrameType::Known(frame)) => info!("Frame: {:?}", frame),
             Ok(FrameType::Unknown(unknown)) => {
