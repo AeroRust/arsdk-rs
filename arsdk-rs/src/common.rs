@@ -360,7 +360,7 @@ mod common_tests {
     }
 
     fn assert_class(dc: Class, v: u8) {
-        let as_u8: u8 = dc.into();
+        let as_u8: u8 = (&dc).into();
         assert_eq!(v, as_u8);
     }
 

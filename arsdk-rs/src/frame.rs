@@ -39,7 +39,7 @@ pub struct Frame {
     pub buffer_id: BufferID,
     pub sequence_id: u8,
     /// Example of empty feature:
-    /// ```
+    /// ```bash
     /// [2020-07-25T18:51:13Z DEBUG arsdk_rs] Bytes: 1 139 0 8 0 0 0 1
     /// [2020-07-25T18:51:13Z INFO  arsdk_rs::parse] Frame: Frame { frame_type: Ack, buffer_id: ACKFromSendWithAck, sequence_id: 0, feature: Some(ArDrone3(None)) }
     /// ```
@@ -577,7 +577,8 @@ mod frame_tests {
 
     #[test]
     #[ignore]
-    fn test_common_state_anafi4k_frame() {
+    // TODO: Impl CommonState!
+    fn test_feature_common_state() {
         let message: [u8; 12] = [
             2, 127, 20, 12, 0, 0, 0, // common
             0, // Common State
@@ -588,9 +589,8 @@ mod frame_tests {
         let frame = Frame {
             frame_type: Type::Data,
             buffer_id: BufferID::DCNavdata,
-
             sequence_id: 20,
-            feature: Some(command::Feature::Common()),
+            feature: Some(command::Feature::Common(CommonClass::CommonState)),
         };
 
         assert_frames_match(&message, frame);
