@@ -121,7 +121,7 @@ fn retry(times: usize, target: SocketAddr) -> Result<TcpStream, Error> {
     let mut retry = 0;
 
     let mut res = TcpStream::connect_timeout(&target, connection_timeout);
-    str::Utf8Error
+
     while res.is_err() && retry < times {
         retry += 1;
         res = TcpStream::connect_timeout(&target, connection_timeout);

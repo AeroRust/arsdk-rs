@@ -1,7 +1,7 @@
 use crate::frame::{Frame, FrameType};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use log::{debug, error, info};
+use log::{error, info};
 use pnet::datalink;
 use scroll::{ctx::TryIntoCtx, Pread, LE};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -30,8 +30,10 @@ pub mod frame;
 mod handshake;
 pub mod jumping_sumo;
 pub mod parse;
+pub mod listener;
 
 pub(crate) use handshake::perform_handshake;
+use listener::Listener;
 
 pub mod prelude {
     pub use crate::{
@@ -217,19 +219,15 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
 }
 
 fn spawn_listener(drone: Drone, addr: SocketAddr) -> Result<(), ConnectionError> {
-    let listener = UdpSocket::bind(addr).map_err(|error| ConnectionError::Io { error, addr })?;
+    let listener_socket = UdpSocket::bind(addr).map_err(|error| ConnectionError::Io { error, addr })?;
 
     std::thread::spawn(move || {
-        let drone = drone.clone();
-        loop {
-            let mut buf = [0_u8; 256];
-            if let Ok((bytes_read, origin)) = listener.recv_from(&mut buf) {
-                debug!("Received: {} bytes from {}", bytes_read, origin);
-                debug!("Bytes: {}", print_buf(&buf[..bytes_read]));
+        let listener = Listener {
+            drone: drone.clone(),
+            socket: listener_socket
+        };
 
-                crate::parse::handle_bytes(&drone, &buf[..bytes_read]);
-            }
-        }
+        listener.listen();
     });
 
     Ok(())

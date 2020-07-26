@@ -213,10 +213,7 @@ pub mod scroll_impl {
                         class: unknown_class,
                         data: feature_data[..actual_written].to_vec(),
                     }
-                } // return Err(Error::OutOfBound {
-                  //     value: value.into(),
-                  //     param: "Class".to_string(),
-                  // })
+                }
             };
 
             Ok((class, offset))
