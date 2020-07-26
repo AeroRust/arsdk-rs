@@ -1,5 +1,4 @@
 use crate::{command, Drone};
-use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use std::convert::TryFrom;
 use std::fmt;
 use thiserror::Error;
@@ -171,8 +170,8 @@ pub enum BufferID {
 
 // --------------------- Conversion impls --------------------- //
 impl TryFrom<u8> for Type {
-    type Error = AnyError;
-    fn try_from(v: u8) -> AnyResult<Self> {
+    type Error = Error;
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
         match v {
             0 => Ok(Self::Uninitialized),
             1 => Ok(Self::Ack),
@@ -180,7 +179,10 @@ impl TryFrom<u8> for Type {
             3 => Ok(Self::LowLatency),
             4 => Ok(Self::DataWithAck),
             5 => Ok(Self::Max),
-            _ => Err(anyhow!("{} is not a valid Type variant", v)),
+            _ => Err(Error::OutOfBound {
+                value: v.into(),
+                param: "Type".to_string(),
+            }),
         }
     }
 }
@@ -199,8 +201,8 @@ impl Into<u8> for Type {
 }
 
 impl TryFrom<u8> for BufferID {
-    type Error = AnyError;
-    fn try_from(v: u8) -> AnyResult<Self> {
+    type Error = Error;
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
         match v {
             0 => Ok(Self::PING),
             1 => Ok(Self::PONG),
@@ -212,7 +214,10 @@ impl TryFrom<u8> for BufferID {
             126 => Ok(Self::DCEvent),
             127 => Ok(Self::DCNavdata),
             139 => Ok(Self::ACKFromSendWithAck),
-            _ => Err(anyhow!("{} is not a valid frame ID variant", v)),
+            _ => Err(Error::OutOfBound {
+                value: v.into(),
+                param: "BufferID".to_string(),
+            }),
         }
     }
 }

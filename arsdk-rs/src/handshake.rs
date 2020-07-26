@@ -94,9 +94,9 @@ pub(crate) fn perform_handshake(
     info!("Request: {}", serde_json::to_string(&request)?);
     let request_string = serde_json::to_vec(&request)?;
 
-    handshake_stream.write_all(&request_string).expect("here");
+    handshake_stream.write_all(&request_string)?;
 
-    let mut buf = [0_u8; 4096];
+    let mut buf = [0_u8; 256];
     let read = handshake_stream.read(&mut buf)?;
     info!("Read {} bytes!", read);
 

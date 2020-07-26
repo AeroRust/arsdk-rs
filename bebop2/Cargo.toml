@@ -4,14 +4,13 @@ version = "0.1.0"
 authors = ["Lachezar Lechev <elpiel93@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-anyhow = "1.0"
 arsdk-rs = { path = "../arsdk-rs" }
 
 [dev-dependencies]
 # Used for examples
 env_logger = "0.7"
 log = "0.4"
+smol = { version = "0.3"}
+async-log = "^2.0"
 tokio = {version = "0.2", features = ["rt-threaded", "macros", "time"]}
