@@ -80,15 +80,16 @@ pub(crate) fn parse_message_frames(buf: &[u8]) -> Vec<Result<FrameType, Error>> 
     frames
 }
 
-
 #[cfg(test)]
 mod parse_message_frames {
     use super::*;
-    use crate::{command::{Feature}, frame::{Frame, BufferID, Type, FrameType, Error}};
     use crate::jumping_sumo as js;
+    use crate::{
+        command::Feature,
+        frame::{BufferID, Error, Frame, FrameType, Type},
+    };
     #[test]
     fn test_parsable_messages() {
-
         let jump_message: [u8; 15] = [
             0x4, 0xb, 0x1, 0xf, 0x0, 0x0, 0x0, 0x3, 0x2, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0,
         ];
@@ -152,7 +153,11 @@ mod parse_message_frames {
         let actual = parse_message_frames(&buf);
 
         assert_eq!(actual.len(), 1);
-        let actual = actual.into_iter().next().expect("Should have 1 parsed frame").expect("Should be Ok(_)");
+        let actual = actual
+            .into_iter()
+            .next()
+            .expect("Should have 1 parsed frame")
+            .expect("Should be Ok(_)");
 
         assert_eq!(FrameType::Known(frame), actual);
     }
