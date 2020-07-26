@@ -19,7 +19,7 @@ pub(crate) fn handle_bytes(drone: &Drone, raw_frames: &[u8]) {
                 info!("Unknown Frame: {:?}", unknown);
                 info!("Bytes: {}", print_buf(raw_frames));
             }
-            Err(err) => error!("Receiving Frame: {}", err),
+            Err(err) => error!("Receiving Frame: {:?}", err),
         }
     }
 
@@ -67,11 +67,93 @@ pub(crate) fn parse_message_frames(buf: &[u8]) -> Vec<Result<FrameType, Error>> 
     // TODO: Check how many frames can we receive at once
     // reasonable given that we receive at most (MAYBE?!) 2 frames
     let mut frames = Vec::with_capacity(3);
-    while offset != buf.len() {
+
+    let mut tried = 1;
+    // try to read all the buf length & limit to 3 Frames of read
+    while offset != buf.len() && tried <= 3 {
         let frame = buf.gread_with(&mut offset, LE);
 
         frames.push(frame);
+        tried += 1;
     }
 
     frames
+}
+
+
+#[cfg(test)]
+mod parse_message_frames {
+    use super::*;
+    use crate::{command::{Feature}, frame::{Frame, BufferID, Type, FrameType, Error}};
+    use crate::jumping_sumo as js;
+    #[test]
+    fn test_parsable_messages() {
+
+        let jump_message: [u8; 15] = [
+            0x4, 0xb, 0x1, 0xf, 0x0, 0x0, 0x0, 0x3, 0x2, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0,
+        ];
+
+        let jump_frame = Frame {
+            frame_type: Type::DataWithAck,
+            buffer_id: BufferID::CDAck,
+            sequence_id: 1,
+            feature: Some(Feature::JumpingSumo(js::Class::Animations(js::Anim::Jump))),
+        };
+
+        let move_message: [u8; 14] = [
+            0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c,
+        ];
+
+        let pilot_state = js::PilotState {
+            flag: true,
+            speed: 0,
+            turn: -100,
+        };
+
+        let move_frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::CDNonAck,
+            sequence_id: 103,
+            feature: Some(Feature::JumpingSumo(js::Class::Piloting(
+                js::PilotingID::Pilot(pilot_state),
+            ))),
+        };
+
+        let buf = {
+            let mut vec = jump_message.to_vec();
+            vec.extend_from_slice(&move_message);
+            vec
+        };
+
+        let expected = [FrameType::Known(jump_frame), FrameType::Known(move_frame)];
+
+        let actual = parse_message_frames(&buf);
+
+        assert_eq!(expected.len(), actual.len());
+
+        for (expected, parsed) in expected.iter().zip(actual) {
+            let actual = parsed.expect("This should be Ok(_)");
+
+            assert_eq!(expected, &actual);
+        }
+    }
+
+    #[test]
+    fn test_feature_common_none() {
+        let buf: [u8; 8] = [1, 139, 0, 8, 0, 0, 0, 0];
+
+        let frame = Frame {
+            frame_type: Type::Ack,
+            buffer_id: BufferID::ACKFromSendWithAck,
+            sequence_id: 0,
+            feature: Some(Feature::Common(None)),
+        };
+
+        let actual = parse_message_frames(&buf);
+
+        assert_eq!(actual.len(), 1);
+        let actual = actual.into_iter().next().expect("Should have 1 parsed frame").expect("Should be Ok(_)");
+
+        assert_eq!(FrameType::Known(frame), actual);
+    }
 }

@@ -11,6 +11,5 @@ arsdk-rs = { path = "../arsdk-rs" }
 # Used for examples
 env_logger = "0.7"
 log = "0.4"
-smol = { version = "0.3"}
 async-log = "^2.0"
-tokio = {version = "0.2", features = ["rt-threaded", "macros", "time"]}
+tokio = {version = "0.2.22", features = ["rt-threaded", "macros", "time"]}

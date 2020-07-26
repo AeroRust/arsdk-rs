@@ -162,7 +162,7 @@ impl Drone {
         use common::Class;
         use frame::{BufferID, Type};
 
-        let date_feature = Common(Class::Common(common::Common::CurrentDate(date)));
+        let date_feature = Common(Some(Class::Common(common::Common::CurrentDate(date))));
 
         let frame = Frame::for_drone(
             &self,
@@ -173,7 +173,7 @@ impl Drone {
 
         self.send_frame(frame)?;
 
-        let time_feature = Common(Class::Common(common::Common::CurrentTime(date)));
+        let time_feature = Common(Some(Class::Common(common::Common::CurrentTime(date))));
         let frame = Frame::for_drone(
             &self,
             Type::DataWithAck,
@@ -305,12 +305,12 @@ mod test {
             // BufferID::DCNavdata = 127
             // Sequence: 71
             // Frame size: 35
-            // Feature: 1
+            // ArDrone3 - Feature - 1
+            // Piloting State - 4
+            // Data?
             2, 127, 71, 35, 0, 0, 0, 1, 4, 4, 0, 0, 0, 0, 0, 0, 64, 127, 64, 0, 0, 0, 0, 0, 64, 127,
             64, 0, 0, 0, 0, 0, 64, 127, 64,
         ];
-        let expected_first_frame_length = 23; // [23, 0, 0, 0]
-
         let frames = parse_message_frames(&received);
 
         assert_eq!(2, frames.len());
@@ -322,7 +322,8 @@ mod test {
             feature: Some(Feature::Unknown {
                 feature: 9,
                 // data starts at 8th bytes
-                data: received[8..expected_first_frame_length].to_vec(),
+                // 23 the frame is 23 bytes long
+                data: received[8..23].to_vec(),
             }),
         };
 
@@ -331,13 +332,8 @@ mod test {
             frame_type: Type::Data,
             buffer_id: BufferID::DCNavdata,
             sequence_id: 71,
-            feature: Some(Feature::ArDrone3(Some(ArDrone3::Unknown {
-                ardrone3: 4,
-                data: {
-                    // `1 +` because we exclude the `ardrone3` in `ArDrone::Unknown.data`
-                    let offset = 1 + expected_first_frame_length + 8;
-                    received[offset..].to_vec()
-                },
+            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState {
+                data: received[32..].to_vec(),
             }))),
         };
 

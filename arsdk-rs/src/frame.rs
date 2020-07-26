@@ -159,11 +159,11 @@ pub enum BufferID {
     /// @TODO: Find the corresponding C definition if there is one and name the new enum variant!
     /// PyParrot:
     /// `'ACK_FROM_SEND_WITH_ACK': 139  # 128 + buffer id for 'SEND_WITH_ACK' is 139`
-    /// Type = 1
-    /// BufferId = 139
+    /// Type = Ack = 1
+    /// BufferId = ACKFromSendWithAck = 139
     /// Sequence = 1
     /// length = 8
-    /// Feature = 1
+    /// Feature = ArDrone3 = 1
     /// 1 139 1 8 0 0 0 1
     ACKFromSendWithAck = 139,
 }
@@ -306,7 +306,7 @@ pub mod impl_scroll {
             // TODO: Fix this as it might fail, use TryFrom<u32>
             let buf_len_usize = buf_len as usize;
 
-            let feature = if buf_len > 7 {
+            let feature = if buf_len >= 8 {
                 // we can receive multiple frames, so the feature should be limited
                 // to buf_len from source
 
@@ -444,12 +444,14 @@ pub mod impl_scroll {
 mod frame_tests {
     use super::*;
     use crate::{
+        ardrone3::ArDrone3,
         common::{self, Class as CommonClass},
         jumping_sumo::*,
     };
     use chrono::{TimeZone, Utc};
     use scroll::{Pread, Pwrite, LE};
 
+    use command::Feature;
     use std::convert::TryInto;
 
     #[test]
@@ -490,9 +492,9 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 1,
-            feature: Some(command::Feature::Common(CommonClass::Common(
+            feature: Some(command::Feature::Common(Some(CommonClass::Common(
                 common::Common::CurrentDate(date),
-            ))),
+            )))),
         };
 
         assert_frames_match(&message, frame);
@@ -515,9 +517,9 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 2,
-            feature: Some(command::Feature::Common(CommonClass::Common(
+            feature: Some(command::Feature::Common(Some(CommonClass::Common(
                 common::Common::CurrentTime(date),
-            ))),
+            )))),
         };
 
         assert_frames_match(&message, frame);
@@ -595,7 +597,30 @@ mod frame_tests {
             frame_type: Type::Data,
             buffer_id: BufferID::DCNavdata,
             sequence_id: 20,
-            feature: Some(command::Feature::Common(CommonClass::CommonState)),
+            feature: Some(command::Feature::Common(Some(CommonClass::CommonState))),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
+    #[test]
+    /// [2] Data
+    /// [127] DCNavadata
+    /// [206] Sequence ID
+    /// [15, 0, 0, 0] 15 length
+    /// [1] ArDrone
+    /// [4] Piloting state
+    /// [21, 0, 126, 163, 163, 64] Data?
+    fn test_unknown_ardrone3_piloting_state_feature() {
+        let message: [u8; 15] = [2, 127, 206, 15, 0, 0, 0, 1, 4, 21, 0, 126, 163, 163, 64];
+
+        let frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::DCNavdata,
+            sequence_id: 206,
+            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState {
+                data: message[9..].to_vec(),
+            }))),
         };
 
         assert_frames_match(&message, frame);

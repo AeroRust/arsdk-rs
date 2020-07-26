@@ -4,7 +4,7 @@ use crate::jumping_sumo;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Feature {
-    Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
+    Common(Option<common::Class>),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     ArDrone3(Option<ArDrone3>),       // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
     Minidrone,                        // ARCOMMANDS_ID_FEATURE_MINIDRONE = 2,
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
@@ -89,8 +89,15 @@ pub mod scroll_impl {
 
             let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => {
-                    let common = src.gread_with(&mut offset, ctx)?;
-                    Self::Common(common)
+                    let class = if !src[offset..].is_empty() {
+
+                        let common = src.gread_with(&mut offset, ctx)?;
+                        Some(common)
+                    }else {
+                        None
+                    };
+
+                    Self::Common(class)
                 }
                 1 => {
                     let ardrone3 = if !src[offset..].is_empty() {
@@ -191,7 +198,7 @@ mod command_tests {
     #[test]
     fn test_feature() {
         assert_feature(
-            Feature::Common(common::Class::Common(common::Common::AllStates)),
+            Feature::Common(Some(common::Class::Common(common::Common::AllStates))),
             0,
         );
         assert_feature(
