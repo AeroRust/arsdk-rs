@@ -29,8 +29,8 @@ pub mod common;
 pub mod frame;
 mod handshake;
 pub mod jumping_sumo;
-pub mod parse;
 pub mod listener;
+pub mod parse;
 
 pub(crate) use handshake::perform_handshake;
 use listener::Listener;
@@ -219,12 +219,13 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
 }
 
 fn spawn_listener(drone: Drone, addr: SocketAddr) -> Result<(), ConnectionError> {
-    let listener_socket = UdpSocket::bind(addr).map_err(|error| ConnectionError::Io { error, addr })?;
+    let listener_socket =
+        UdpSocket::bind(addr).map_err(|error| ConnectionError::Io { error, addr })?;
 
     std::thread::spawn(move || {
         let listener = Listener {
             drone: drone.clone(),
-            socket: listener_socket
+            socket: listener_socket,
         };
 
         listener.listen();

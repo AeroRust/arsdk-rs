@@ -1,6 +1,7 @@
 use crate::{
+    command::Feature,
     frame::{BufferID, Error, Frame, Type},
-    print_buf, Drone, FrameType, command::Feature,
+    print_buf, Drone, FrameType,
 };
 use log::{error, info};
 use scroll::{Pread, LE};
@@ -45,10 +46,10 @@ pub(crate) fn handle_bytes(drone: &Drone, raw_frames: &[u8]) {
                 });
 
                 let ack_frame = Frame {
-                     frame_type: ack_type,
-                     buffer_id: ack_buffer,
-                     feature,
-                     sequence_id: ack_sequence_id,
+                    frame_type: ack_type,
+                    buffer_id: ack_buffer,
+                    feature,
+                    sequence_id: ack_sequence_id,
                 };
                 if let Err(err) = drone.send_frame(ack_frame) {
                     error!("Sending Frame to Commander: {}", err)
