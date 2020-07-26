@@ -40,7 +40,8 @@ pub struct Response {
     pub qos_mode: u8,
     // @TODO: Check what this field is for **and** if it's a bool at all
     /// Bool?!
-    proto_v: u8,
+    #[serde(default)]
+    pub proto_v: Option<u8>,
 }
 
 with_prefix!(prefix_arstream2_client "arstream2_client_");
@@ -106,7 +107,7 @@ pub(crate) fn perform_handshake(
 
     handshake_stream.shutdown(Shutdown::Both)?;
 
-    let response: Response = serde_json::from_str(&response_string)?;
+    let response: Response = serde_json::from_str(&response_string.trim_end_matches('\u{0}'))?;
 
     if response.status != 0 {
         Err(Error::ConnectionRefused(response))
