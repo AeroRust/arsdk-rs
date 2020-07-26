@@ -203,8 +203,8 @@ impl DroneInner {
 
             command_id
         } else {
-            self.sequence_ids.insert(buffer_id, 1);
-            1
+            self.sequence_ids.insert(buffer_id, 0);
+            0
         }
     }
 }
