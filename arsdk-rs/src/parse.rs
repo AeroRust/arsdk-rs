@@ -86,7 +86,7 @@ mod parse_message_frames {
     use crate::jumping_sumo as js;
     use crate::{
         command::Feature,
-        frame::{BufferID, Error, Frame, FrameType, Type},
+        frame::{BufferID, Frame, FrameType, Type},
     };
     #[test]
     fn test_parsable_messages() {
@@ -160,5 +160,62 @@ mod parse_message_frames {
             .expect("Should be Ok(_)");
 
         assert_eq!(FrameType::Known(frame), actual);
+    }
+
+    #[test]
+    /// [2] Type - Data
+    /// [0] BufferID - Ping
+    /// [1] Sequence id 1
+    /// [23,0,0,0] length 23
+    /// [0, 0, 0, 0, 0, 0, 0, 233, 72, 37, 42, 0, 0, 0, 0] Ping's Gibberish Data
+    ///
+    /// Second:
+    /// [4] Type - DataWithAck
+    /// [126] BufferID - DCEvent
+    /// [1] Sequence id 1
+    /// [12, 0, 0, 0 ] Length 12
+    /// [0] Feature - Common
+    /// [14] Class - CalibrationState
+    /// [1, 0 , 0] - DATA?!
+    ///
+    fn test_two_frames_ping_and_common_class_calibration_state_unknown() {
+        let buf: [u8; 35] = [
+            // first:
+            2, 0, 1, 23, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 233, 72, 37, 42, 0, 0, 0, 0,
+            // second:
+            4, 126, 1, 12, 0, 0, 0, 0, 14, 1, 0, 0,
+        ];
+
+        let expected = [
+            FrameType::Known(Frame {
+                frame_type: Type::Data,
+                buffer_id: BufferID::PING,
+                sequence_id: 1,
+                feature: Some(Feature::Unknown {
+                    feature: 3,
+                    data: vec![0, 0, 0, 0, 0, 0, 0, 233, 72, 37, 42, 0, 0, 0, 0],
+                }),
+            }),
+            FrameType::Known(Frame {
+                frame_type: Type::DataWithAck,
+                buffer_id: BufferID::DCEvent,
+                sequence_id: 1,
+                feature: Some(Feature::Common(Some(crate::common::Class::Unknown {
+                    // CalibrationState
+                    class: 14,
+                    // x y z axis
+                    data: vec![1, 0, 0],
+                }))),
+            }),
+        ];
+
+        let actual = parse_message_frames(&buf);
+        assert_eq!(expected.len(), actual.len());
+
+        for (expected, parsed) in expected.iter().zip(actual) {
+            let actual = parsed.expect("This should be Ok(_)");
+
+            assert_eq!(expected, &actual);
+        }
     }
 }

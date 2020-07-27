@@ -310,10 +310,31 @@ pub mod impl_scroll {
                 // we can receive multiple frames, so the feature should be limited
                 // to buf_len from source
 
-                let feature =
-                    src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, ctx)?;
+                // for the PING & PONG we don't reasonable data
+                // only data to echo back from PING
+                if [BufferID::PING, BufferID::PONG].contains(&buffer_id) {
+                    // even if it's a known one, the PING doesn't send sane data
+                    let feature = src[..buf_len_usize].gread_with(&mut actual_buf_len, ctx)?;
 
-                Some(feature)
+                    let mut feature_data = [0_u8; 256];
+                    let actual_written = feature_data.gwrite_with(
+                        &src[actual_buf_len..buf_len_usize],
+                        &mut 0,
+                        (),
+                    )?;
+
+                    actual_buf_len += actual_written;
+
+                    Some(Feature::Unknown {
+                        feature,
+                        data: feature_data[..actual_written].to_vec(),
+                    })
+                } else {
+                    let feature =
+                        src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, ctx)?;
+
+                    Some(feature)
+                }
             } else {
                 None
             };
@@ -526,6 +547,16 @@ mod frame_tests {
     }
 
     #[test]
+    /// [2] Type::Data
+    /// [10] BufferId::CDNonAck
+    /// [103] Sequence ID
+    /// [14, 0, 0, 0] Length 14
+    /// [3] Feature JS
+    /// [0] - JS Class - Piloting
+    /// [0, 0] Pilot (PCMD)
+    /// [1] flag: true
+    /// [0] speed
+    /// [156] turn: -100
     fn test_jumpingsumo_move_command() {
         let message: [u8; 14] = [
             0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c,
@@ -604,8 +635,8 @@ mod frame_tests {
     }
 
     #[test]
-    /// [2] Data
-    /// [127] DCNavadata
+    /// [2] Type::Data
+    /// [127] BufferID::DCNavadata
     /// [206] Sequence ID
     /// [15, 0, 0, 0] 15 length
     /// [1] ArDrone
@@ -635,12 +666,11 @@ mod frame_tests {
         assert_eq!(buf_len as usize, expected.len());
 
         // Deserialize a Frame
-        assert_eq!(
-            frame,
-            expected
-                .pread_with::<Frame>(0, LE)
-                .expect("Should deserialize"),
-        );
+        let deserialized = expected
+            .pread_with::<Frame>(0, LE)
+            .expect("Should deserialize");
+
+        assert_eq!(frame, deserialized);
         let mut actual = [0_u8; 256];
         assert!(
             actual.len() > buf_len as usize,

@@ -44,25 +44,40 @@ pub enum Class {
     MavlinkState,            // ARCOMMANDS_ID_COMMON_CLASS_MAVLINKSTATE = 12,
     FlightPlanSettings,      // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSETTINGS = 32,
     FlightPlanSettingsState, // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSETTINGSSTATE = 33,
-    Calibration,             // ARCOMMANDS_ID_COMMON_CLASS_CALIBRATION = 13,
-    CalibrationState,        // ARCOMMANDS_ID_COMMON_CLASS_CALIBRATIONSTATE = 14,
-    CameraSettingsState,     // ARCOMMANDS_ID_COMMON_CLASS_CAMERASETTINGSSTATE = 15,
-    Gps,                     // ARCOMMANDS_ID_COMMON_CLASS_GPS = 16,
-    FlightPlanState,         // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSTATE = 17,
-    FlightPlanEvent,         // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANEVENT = 19,
-    ArLibsVersionsState,     // ARCOMMANDS_ID_COMMON_CLASS_ARLIBSVERSIONSSTATE = 18,
-    Audio,                   // ARCOMMANDS_ID_COMMON_CLASS_AUDIO = 20,
-    AudioState,              // ARCOMMANDS_ID_COMMON_CLASS_AUDIOSTATE = 21,
-    HeadLights,              // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTS = 22,
-    HeadLightsState,         // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTSSTATE = 23,
-    Animations,              // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONS = 24,
-    AnimationsState,         // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONSSTATE = 25,
-    Accessory,               // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORY = 26,
-    AccessoryState,          // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORYSTATE = 27,
-    Charger,                 // ARCOMMANDS_ID_COMMON_CLASS_CHARGER = 28,
-    ChargerState,            // ARCOMMANDS_ID_COMMON_CLASS_CHARGERSTATE = 29,
-    Runstate,                // ARCOMMANDS_ID_COMMON_CLASS_RUNSTATE = 30,
-    Factory,                 // ARCOMMANDS_ID_COMMON_CLASS_FACTORY = 31,
+    /// ARCOMMANDS_ID_COMMON_CLASS_CALIBRATION = 13
+    ///
+    /// First cmd:
+    /// u16 - ARCOMMANDS_ID_COMMON_CALIBRATION_CMD_MAGNETOCALIBRATION
+    /// u8 - _calibrate
+    ///
+    /// Second cmd:
+    /// u16 - ARCOMMANDS_ID_COMMON_CALIBRATION_CMD_PITOTCALIBRATION
+    /// u8 - _calibrate
+    Calibration,
+    /// ARCOMMANDS_ID_COMMON_CLASS_CALIBRATIONSTATE = 14
+    /// u16 - ARCOMMANDS_ID_COMMON_CALIBRATIONSTATE_CMD_MAGNETOCALIBRATIONSTATECHANGED
+    /// u8 - _xAxisCalibration
+    /// u8 - _yAxisCalibration
+    /// u8 - _zAxisCalibration
+    /// u8 - _calibrationFailed
+    CalibrationState,
+    CameraSettingsState, // ARCOMMANDS_ID_COMMON_CLASS_CAMERASETTINGSSTATE = 15,
+    Gps,                 // ARCOMMANDS_ID_COMMON_CLASS_GPS = 16,
+    FlightPlanState,     // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSTATE = 17,
+    FlightPlanEvent,     // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANEVENT = 19,
+    ArLibsVersionsState, // ARCOMMANDS_ID_COMMON_CLASS_ARLIBSVERSIONSSTATE = 18,
+    Audio,               // ARCOMMANDS_ID_COMMON_CLASS_AUDIO = 20,
+    AudioState,          // ARCOMMANDS_ID_COMMON_CLASS_AUDIOSTATE = 21,
+    HeadLights,          // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTS = 22,
+    HeadLightsState,     // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTSSTATE = 23,
+    Animations,          // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONS = 24,
+    AnimationsState,     // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONSSTATE = 25,
+    Accessory,           // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORY = 26,
+    AccessoryState,      // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORYSTATE = 27,
+    Charger,             // ARCOMMANDS_ID_COMMON_CLASS_CHARGER = 28,
+    ChargerState,        // ARCOMMANDS_ID_COMMON_CLASS_CHARGERSTATE = 29,
+    Runstate,            // ARCOMMANDS_ID_COMMON_CLASS_RUNSTATE = 30,
+    Factory,             // ARCOMMANDS_ID_COMMON_CLASS_FACTORY = 31,
     Unknown {
         class: u8,
         data: Vec<u8>,
