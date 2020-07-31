@@ -1,5 +1,4 @@
 use crate::{command, Drone};
-use anyhow::{anyhow, Error as AnyError, Result as AnyResult};
 use std::convert::TryFrom;
 use std::fmt;
 use thiserror::Error;
@@ -38,6 +37,11 @@ pub struct Frame {
     pub frame_type: Type,
     pub buffer_id: BufferID,
     pub sequence_id: u8,
+    /// Example of empty feature:
+    /// ```bash
+    /// [2020-07-25T18:51:13Z DEBUG arsdk_rs] Bytes: 1 139 0 8 0 0 0 1
+    /// [2020-07-25T18:51:13Z INFO  arsdk_rs::parse] Frame: Frame { frame_type: Ack, buffer_id: ACKFromSendWithAck, sequence_id: 0, feature: Some(ArDrone3(None)) }
+    /// ```
     pub feature: Option<command::Feature>,
 }
 
@@ -155,19 +159,19 @@ pub enum BufferID {
     /// @TODO: Find the corresponding C definition if there is one and name the new enum variant!
     /// PyParrot:
     /// `'ACK_FROM_SEND_WITH_ACK': 139  # 128 + buffer id for 'SEND_WITH_ACK' is 139`
-    /// Type = 1
-    /// BufferId = 139
+    /// Type = Ack = 1
+    /// BufferId = ACKFromSendWithAck = 139
     /// Sequence = 1
     /// length = 8
-    /// Feature = 1
+    /// Feature = ArDrone3 = 1
     /// 1 139 1 8 0 0 0 1
     ACKFromSendWithAck = 139,
 }
 
 // --------------------- Conversion impls --------------------- //
 impl TryFrom<u8> for Type {
-    type Error = AnyError;
-    fn try_from(v: u8) -> AnyResult<Self> {
+    type Error = Error;
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
         match v {
             0 => Ok(Self::Uninitialized),
             1 => Ok(Self::Ack),
@@ -175,7 +179,10 @@ impl TryFrom<u8> for Type {
             3 => Ok(Self::LowLatency),
             4 => Ok(Self::DataWithAck),
             5 => Ok(Self::Max),
-            _ => Err(anyhow!("{} is not a valid Type variant", v)),
+            _ => Err(Error::OutOfBound {
+                value: v.into(),
+                param: "Type".to_string(),
+            }),
         }
     }
 }
@@ -194,8 +201,8 @@ impl Into<u8> for Type {
 }
 
 impl TryFrom<u8> for BufferID {
-    type Error = AnyError;
-    fn try_from(v: u8) -> AnyResult<Self> {
+    type Error = Error;
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
         match v {
             0 => Ok(Self::PING),
             1 => Ok(Self::PONG),
@@ -207,7 +214,10 @@ impl TryFrom<u8> for BufferID {
             126 => Ok(Self::DCEvent),
             127 => Ok(Self::DCNavdata),
             139 => Ok(Self::ACKFromSendWithAck),
-            _ => Err(anyhow!("{} is not a valid frame ID variant", v)),
+            _ => Err(Error::OutOfBound {
+                value: v.into(),
+                param: "BufferID".to_string(),
+            }),
         }
     }
 }
@@ -296,14 +306,35 @@ pub mod impl_scroll {
             // TODO: Fix this as it might fail, use TryFrom<u32>
             let buf_len_usize = buf_len as usize;
 
-            let feature = if buf_len > 7 {
+            let feature = if buf_len >= 8 {
                 // we can receive multiple frames, so the feature should be limited
                 // to buf_len from source
 
-                let feature =
-                    src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, ctx)?;
+                // for the PING & PONG we don't reasonable data
+                // only data to echo back from PING
+                if [BufferID::PING, BufferID::PONG].contains(&buffer_id) {
+                    // even if it's a known one, the PING doesn't send sane data
+                    let feature = src[..buf_len_usize].gread_with(&mut actual_buf_len, ctx)?;
 
-                Some(feature)
+                    let mut feature_data = [0_u8; 256];
+                    let actual_written = feature_data.gwrite_with(
+                        &src[actual_buf_len..buf_len_usize],
+                        &mut 0,
+                        (),
+                    )?;
+
+                    actual_buf_len += actual_written;
+
+                    Some(Feature::Unknown {
+                        feature,
+                        data: feature_data[..actual_written].to_vec(),
+                    })
+                } else {
+                    let feature =
+                        src[..buf_len_usize].gread_with::<Feature>(&mut actual_buf_len, ctx)?;
+
+                    Some(feature)
+                }
             } else {
                 None
             };
@@ -434,12 +465,14 @@ pub mod impl_scroll {
 mod frame_tests {
     use super::*;
     use crate::{
+        ardrone3::ArDrone3,
         common::{self, Class as CommonClass},
         jumping_sumo::*,
     };
     use chrono::{TimeZone, Utc};
     use scroll::{Pread, Pwrite, LE};
 
+    use command::Feature;
     use std::convert::TryInto;
 
     #[test]
@@ -480,9 +513,9 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 1,
-            feature: Some(command::Feature::Common(CommonClass::Common(
+            feature: Some(command::Feature::Common(Some(CommonClass::Common(
                 common::Common::CurrentDate(date),
-            ))),
+            )))),
         };
 
         assert_frames_match(&message, frame);
@@ -505,15 +538,25 @@ mod frame_tests {
             frame_type: Type::DataWithAck,
             buffer_id: BufferID::CDAck,
             sequence_id: 2,
-            feature: Some(command::Feature::Common(CommonClass::Common(
+            feature: Some(command::Feature::Common(Some(CommonClass::Common(
                 common::Common::CurrentTime(date),
-            ))),
+            )))),
         };
 
         assert_frames_match(&message, frame);
     }
 
     #[test]
+    /// [2] Type::Data
+    /// [10] BufferId::CDNonAck
+    /// [103] Sequence ID
+    /// [14, 0, 0, 0] Length 14
+    /// [3] Feature JS
+    /// [0] - JS Class - Piloting
+    /// [0, 0] Pilot (PCMD)
+    /// [1] flag: true
+    /// [0] speed
+    /// [156] turn: -100
     fn test_jumpingsumo_move_command() {
         let message: [u8; 14] = [
             0x2, 0xa, 0x67, 0xe, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x1, 0x0, 0x9c,
@@ -554,6 +597,66 @@ mod frame_tests {
         assert_frames_match(&message, frame);
     }
 
+    #[test]
+    fn test_ping_feature_from_anafi4k() {
+        let message: [u8; 15] = [2, 0, 2, 15, 0, 0, 0, 155, 216, 221, 13, 0, 0, 0, 0];
+        let frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::PING,
+            sequence_id: 2,
+            feature: Some(command::Feature::Unknown {
+                feature: 155,
+                data: vec![216, 221, 13, 0, 0, 0, 0],
+            }),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
+    #[test]
+    #[ignore]
+    // TODO: Impl CommonState!
+    fn test_feature_common_state() {
+        let message: [u8; 12] = [
+            2, 127, 20, 12, 0, 0, 0, // common
+            0, // Common State
+            5, //
+            1, 0, 100,
+        ];
+
+        let frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::DCNavdata,
+            sequence_id: 20,
+            feature: Some(command::Feature::Common(Some(CommonClass::CommonState))),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
+    #[test]
+    /// [2] Type::Data
+    /// [127] BufferID::DCNavadata
+    /// [206] Sequence ID
+    /// [15, 0, 0, 0] 15 length
+    /// [1] ArDrone
+    /// [4] Piloting state
+    /// [21, 0, 126, 163, 163, 64] Data?
+    fn test_unknown_ardrone3_piloting_state_feature() {
+        let message: [u8; 15] = [2, 127, 206, 15, 0, 0, 0, 1, 4, 21, 0, 126, 163, 163, 64];
+
+        let frame = Frame {
+            frame_type: Type::Data,
+            buffer_id: BufferID::DCNavdata,
+            sequence_id: 206,
+            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState {
+                data: message[9..].to_vec(),
+            }))),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
     fn assert_frames_match(expected: &[u8], frame: Frame) {
         // Check the value at the Frame length bytes 3 to 7
         let buf_len: u32 = (&expected[3..7])
@@ -563,12 +666,11 @@ mod frame_tests {
         assert_eq!(buf_len as usize, expected.len());
 
         // Deserialize a Frame
-        assert_eq!(
-            frame,
-            expected
-                .pread_with::<Frame>(0, LE)
-                .expect("Should deserialize"),
-        );
+        let deserialized = expected
+            .pread_with::<Frame>(0, LE)
+            .expect("Should deserialize");
+
+        assert_eq!(frame, deserialized);
         let mut actual = [0_u8; 256];
         assert!(
             actual.len() > buf_len as usize,

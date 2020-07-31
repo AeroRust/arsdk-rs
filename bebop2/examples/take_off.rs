@@ -4,10 +4,20 @@ use std::error::Error;
 use bebop2::prelude::*;
 use std::time::Duration;
 use tokio::time::delay_for;
+// use smol::Timer;
+
+fn async_setup_logger() {
+    let logger = env_logger::Logger::from_default_env();
+
+    async_log::Logger::wrap(logger, || 12)
+        .start(log::LevelFilter::Trace)
+        .unwrap();
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    env_logger::init();
+    // env_logger::init();
+    async_setup_logger();
 
     let drone = Bebop2::connect(PARROT_SPHINX_CONFIG)?;
 
@@ -38,4 +48,5 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     loop {}
+    // })
 }

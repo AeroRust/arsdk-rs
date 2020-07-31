@@ -4,6 +4,7 @@ use serde_with::with_prefix;
 use std::{
     io::{Read, Write},
     net::{Shutdown, SocketAddr, TcpStream},
+    string::FromUtf8Error,
 };
 use thiserror::Error;
 
@@ -34,7 +35,13 @@ pub struct Response {
     pub c2d_update_port: u16,
     pub c2d_user_port: u16,
     pub status: i8,
-    // @TODO: qos_mode: bool maybe?!
+    // @TODO: Check what this field is for.
+    /// Bool?!
+    pub qos_mode: u8,
+    // @TODO: Check what this field is for **and** if it's a bool at all
+    /// Bool?!
+    #[serde(default)]
+    pub proto_v: Option<u8>,
 }
 
 with_prefix!(prefix_arstream2_client "arstream2_client_");
@@ -55,32 +62,52 @@ pub enum Error {
     Retry { target: SocketAddr },
     #[error("Json (de)serialization - {0:?}")]
     Json(#[from] serde_json::Error),
+    /// Primarily used for logging the response string
+    #[error("Response String - {0:?}")]
+    ResponseString(#[from] FromUtf8Error),
 }
 
-pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Response, Error> {
+pub(crate) fn perform_handshake(
+    init_address: SocketAddr,
+    d2c_port: u16,
+) -> Result<Response, Error> {
     let request = Request {
         controller_name: "arsdk-rs".to_string(),
         controller_type: "computer".to_string(),
         d2c_port,
-        // arstream2: Some(ArStream2 {stream_port: 44445, control_port: 44446 }),
-        arstream2: None,
+        // Anafi4k:
+        // self.stream_port = 55004
+        // self.stream_control_port = 55005
+        arstream2: Some(ArStream2 {
+            stream_port: 44445,
+            control_port: 44446,
+        }),
+        // TODO: Check when we don't need `arstream2`
+        // the pyparrot has a check for setting `arstream2` when:
+        // `if(self.drone_type in ("Anafi", "Bebop", "Bebop2", "Disco")):`
+        // arstream2: None,
     };
 
     info!("Connecting controller {}", request.controller_name);
 
-    let mut handshake_stream = retry(10, target)?;
+    let mut handshake_stream = retry(10, init_address)?;
 
-    let request_string = serde_json::to_string(&request)?;
+    info!("Request: {}", serde_json::to_string(&request)?);
+    let request_string = serde_json::to_vec(&request)?;
 
-    handshake_stream.write_all(&request_string.as_bytes())?;
+    handshake_stream.write_all(&request_string)?;
 
-    let mut response_string = String::new();
-    handshake_stream.read_to_string(&mut response_string)?;
-    let response_string = response_string.trim_end_matches('\u{0}');
+    let mut buf = [0_u8; 256];
+    let read = handshake_stream.read(&mut buf)?;
+    info!("Read {} bytes!", read);
+
+    let response_string = String::from_utf8(buf[..read].to_vec())?;
+
+    info!("Response: {}", response_string);
 
     handshake_stream.shutdown(Shutdown::Both)?;
 
-    let response: Response = serde_json::from_str(&response_string)?;
+    let response: Response = serde_json::from_str(&response_string.trim_end_matches('\u{0}'))?;
 
     if response.status != 0 {
         Err(Error::ConnectionRefused(response))
@@ -90,14 +117,29 @@ pub(crate) fn perform_handshake(target: SocketAddr, d2c_port: u16) -> Result<Res
 }
 
 fn retry(times: usize, target: SocketAddr) -> Result<TcpStream, Error> {
-    let timeout = std::time::Duration::from_secs(2);
+    let connection_timeout = std::time::Duration::from_secs(2);
+    let read_timeout = std::time::Duration::from_secs(2);
     let mut retry = 0;
 
-    let mut res = TcpStream::connect_timeout(&target, timeout);
+    let mut res = TcpStream::connect_timeout(&target, connection_timeout);
 
     while res.is_err() && retry < times {
         retry += 1;
-        res = TcpStream::connect_timeout(&target, timeout);
+        res = TcpStream::connect_timeout(&target, connection_timeout);
     }
-    res.map_err(std::convert::Into::into)
+
+    let tcp_stream = match res {
+        Ok(tcp_stream) => tcp_stream,
+        Err(err) => {
+            error!("TCP Stream failed: {}", &err);
+
+            return Err(err.into());
+        }
+    };
+
+    info!("{}: TCP Stream initialized", target);
+
+    tcp_stream.set_read_timeout(Some(read_timeout))?;
+
+    Ok(tcp_stream)
 }

@@ -1,7 +1,7 @@
 use chrono::{offset::Utc, DateTime};
 use std::ffi::CString;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 /// u8
 pub enum Class {
     Network,        // ARCOMMANDS_ID_COMMON_CLASS_NETWORK = 0,
@@ -44,25 +44,44 @@ pub enum Class {
     MavlinkState,            // ARCOMMANDS_ID_COMMON_CLASS_MAVLINKSTATE = 12,
     FlightPlanSettings,      // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSETTINGS = 32,
     FlightPlanSettingsState, // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSETTINGSSTATE = 33,
-    Calibration,             // ARCOMMANDS_ID_COMMON_CLASS_CALIBRATION = 13,
-    CalibrationState,        // ARCOMMANDS_ID_COMMON_CLASS_CALIBRATIONSTATE = 14,
-    CameraSettingsState,     // ARCOMMANDS_ID_COMMON_CLASS_CAMERASETTINGSSTATE = 15,
-    Gps,                     // ARCOMMANDS_ID_COMMON_CLASS_GPS = 16,
-    FlightPlanState,         // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSTATE = 17,
-    FlightPlanEvent,         // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANEVENT = 19,
-    ArLibsVersionsState,     // ARCOMMANDS_ID_COMMON_CLASS_ARLIBSVERSIONSSTATE = 18,
-    Audio,                   // ARCOMMANDS_ID_COMMON_CLASS_AUDIO = 20,
-    AudioState,              // ARCOMMANDS_ID_COMMON_CLASS_AUDIOSTATE = 21,
-    HeadLights,              // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTS = 22,
-    HeadLightsState,         // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTSSTATE = 23,
-    Animations,              // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONS = 24,
-    AnimationsState,         // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONSSTATE = 25,
-    Accessory,               // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORY = 26,
-    AccessoryState,          // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORYSTATE = 27,
-    Charger,                 // ARCOMMANDS_ID_COMMON_CLASS_CHARGER = 28,
-    ChargerState,            // ARCOMMANDS_ID_COMMON_CLASS_CHARGERSTATE = 29,
-    Runstate,                // ARCOMMANDS_ID_COMMON_CLASS_RUNSTATE = 30,
-    Factory,                 // ARCOMMANDS_ID_COMMON_CLASS_FACTORY = 31,
+    /// ARCOMMANDS_ID_COMMON_CLASS_CALIBRATION = 13
+    ///
+    /// First cmd:
+    /// u16 - ARCOMMANDS_ID_COMMON_CALIBRATION_CMD_MAGNETOCALIBRATION
+    /// u8 - _calibrate
+    ///
+    /// Second cmd:
+    /// u16 - ARCOMMANDS_ID_COMMON_CALIBRATION_CMD_PITOTCALIBRATION
+    /// u8 - _calibrate
+    Calibration,
+    /// ARCOMMANDS_ID_COMMON_CLASS_CALIBRATIONSTATE = 14
+    /// u16 - ARCOMMANDS_ID_COMMON_CALIBRATIONSTATE_CMD_MAGNETOCALIBRATIONSTATECHANGED
+    /// u8 - _xAxisCalibration
+    /// u8 - _yAxisCalibration
+    /// u8 - _zAxisCalibration
+    /// u8 - _calibrationFailed
+    CalibrationState,
+    CameraSettingsState, // ARCOMMANDS_ID_COMMON_CLASS_CAMERASETTINGSSTATE = 15,
+    Gps,                 // ARCOMMANDS_ID_COMMON_CLASS_GPS = 16,
+    FlightPlanState,     // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANSTATE = 17,
+    FlightPlanEvent,     // ARCOMMANDS_ID_COMMON_CLASS_FLIGHTPLANEVENT = 19,
+    ArLibsVersionsState, // ARCOMMANDS_ID_COMMON_CLASS_ARLIBSVERSIONSSTATE = 18,
+    Audio,               // ARCOMMANDS_ID_COMMON_CLASS_AUDIO = 20,
+    AudioState,          // ARCOMMANDS_ID_COMMON_CLASS_AUDIOSTATE = 21,
+    HeadLights,          // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTS = 22,
+    HeadLightsState,     // ARCOMMANDS_ID_COMMON_CLASS_HEADLIGHTSSTATE = 23,
+    Animations,          // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONS = 24,
+    AnimationsState,     // ARCOMMANDS_ID_COMMON_CLASS_ANIMATIONSSTATE = 25,
+    Accessory,           // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORY = 26,
+    AccessoryState,      // ARCOMMANDS_ID_COMMON_CLASS_ACCESSORYSTATE = 27,
+    Charger,             // ARCOMMANDS_ID_COMMON_CLASS_CHARGER = 28,
+    ChargerState,        // ARCOMMANDS_ID_COMMON_CLASS_CHARGERSTATE = 29,
+    Runstate,            // ARCOMMANDS_ID_COMMON_CLASS_RUNSTATE = 30,
+    Factory,             // ARCOMMANDS_ID_COMMON_CLASS_FACTORY = 31,
+    Unknown {
+        class: u8,
+        data: Vec<u8>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -81,54 +100,56 @@ pub enum Common {
 fn format_date(date: &DateTime<Utc>) -> CString {
     let format = date.format("%Y-%m-%d").to_string();
 
-    CString::new(format.as_bytes()).expect("CString::new failed with formated date")
+    CString::new(format.as_bytes()).expect("CString::new failed with formatted date")
 }
 // "’T’HHmmssZZZ"forCommon.Common.CurrentTime. Ex:T101527+0200.
 fn format_time(time: &DateTime<Utc>) -> CString {
     let format = time.format("T%H%M%S%z").to_string();
 
-    CString::new(format.as_bytes()).expect("CString::new failed with formated date")
+    CString::new(format.as_bytes()).expect("CString::new failed with formatted date")
 }
 
 // --------------------- Conversion impls --------------------- //
 
-impl Into<u8> for Class {
+impl Into<u8> for &Class {
     fn into(self) -> u8 {
+        use Class::*;
         match self {
-            Self::Network => 0,
-            Self::NetworkEvent => 1,
-            Self::Settings => 2,
-            Self::SettingsState => 3,
-            Self::Common(_) => 4,
-            Self::CommonState => 5,
-            Self::Overheat => 6,
-            Self::OverheatState => 7,
-            Self::Controller => 8,
-            Self::WifiSettings => 9,
-            Self::WifiSettingsState => 10,
-            Self::Mavlink => 11,
-            Self::MavlinkState => 12,
-            Self::FlightPlanSettings => 32,
-            Self::FlightPlanSettingsState => 33,
-            Self::Calibration => 13,
-            Self::CalibrationState => 14,
-            Self::CameraSettingsState => 15,
-            Self::Gps => 16,
-            Self::FlightPlanState => 17,
-            Self::FlightPlanEvent => 19,
-            Self::ArLibsVersionsState => 18,
-            Self::Audio => 20,
-            Self::AudioState => 21,
-            Self::HeadLights => 22,
-            Self::HeadLightsState => 23,
-            Self::Animations => 24,
-            Self::AnimationsState => 25,
-            Self::Accessory => 26,
-            Self::AccessoryState => 27,
-            Self::Charger => 28,
-            Self::ChargerState => 29,
-            Self::Runstate => 30,
-            Self::Factory => 31,
+            Network => 0,
+            NetworkEvent => 1,
+            Settings => 2,
+            SettingsState => 3,
+            Common(_) => 4,
+            CommonState => 5,
+            Overheat => 6,
+            OverheatState => 7,
+            Controller => 8,
+            WifiSettings => 9,
+            WifiSettingsState => 10,
+            Mavlink => 11,
+            MavlinkState => 12,
+            FlightPlanSettings => 32,
+            FlightPlanSettingsState => 33,
+            Calibration => 13,
+            CalibrationState => 14,
+            CameraSettingsState => 15,
+            Gps => 16,
+            FlightPlanState => 17,
+            FlightPlanEvent => 19,
+            ArLibsVersionsState => 18,
+            Audio => 20,
+            AudioState => 21,
+            HeadLights => 22,
+            HeadLightsState => 23,
+            Animations => 24,
+            AnimationsState => 25,
+            Accessory => 26,
+            AccessoryState => 27,
+            Charger => 28,
+            ChargerState => 29,
+            Runstate => 30,
+            Factory => 31,
+            Unknown { class, .. } => *class,
         }
     }
 }
@@ -166,40 +187,47 @@ pub mod scroll_impl {
 
                     Self::Common(common)
                 }
-                5 => Self::CommonState,
-                6 => Self::Overheat,
-                7 => Self::OverheatState,
-                8 => Self::Controller,
-                9 => Self::WifiSettings,
-                10 => Self::WifiSettingsState,
-                11 => Self::Mavlink,
-                12 => Self::MavlinkState,
-                13 => Self::Calibration,
-                14 => Self::CalibrationState,
-                15 => Self::CameraSettingsState,
-                16 => Self::Gps,
-                17 => Self::FlightPlanState,
-                18 => Self::ArLibsVersionsState,
-                19 => Self::FlightPlanEvent,
-                20 => Self::Audio,
-                21 => Self::AudioState,
-                22 => Self::HeadLights,
-                23 => Self::HeadLightsState,
-                24 => Self::Animations,
-                25 => Self::AnimationsState,
-                26 => Self::Accessory,
-                27 => Self::AccessoryState,
-                28 => Self::Charger,
-                29 => Self::ChargerState,
-                30 => Self::Runstate,
-                31 => Self::Factory,
-                32 => Self::FlightPlanSettings,
-                33 => Self::FlightPlanSettingsState,
-                value => {
-                    return Err(Error::OutOfBound {
-                        value: value.into(),
-                        param: "Class".to_string(),
-                    })
+                // 5 => Self::CommonState,
+                // 6 => Self::Overheat,
+                // 7 => Self::OverheatState,
+                // 8 => Self::Controller,
+                // 9 => Self::WifiSettings,
+                // 10 => Self::WifiSettingsState,
+                // 11 => Self::Mavlink,
+                // 12 => Self::MavlinkState,
+                // 13 => Self::Calibration,
+                // 14 => Self::CalibrationState,
+                // 15 => Self::CameraSettingsState,
+                // 16 => Self::Gps,
+                // 17 => Self::FlightPlanState,
+                // 18 => Self::ArLibsVersionsState,
+                // 19 => Self::FlightPlanEvent,
+                // 20 => Self::Audio,
+                // 21 => Self::AudioState,
+                // 22 => Self::HeadLights,
+                // 23 => Self::HeadLightsState,
+                // 24 => Self::Animations,
+                // 25 => Self::AnimationsState,
+                // 26 => Self::Accessory,
+                // 27 => Self::AccessoryState,
+                // 28 => Self::Charger,
+                // 29 => Self::ChargerState,
+                // 30 => Self::Runstate,
+                // 31 => Self::Factory,
+                // 32 => Self::FlightPlanSettings,
+                // 33 => Self::FlightPlanSettingsState,
+                unknown_class => {
+                    let mut feature_data = [0_u8; 256];
+                    let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
+
+                    assert_eq!(actual_written, feature_data[..actual_written].len());
+
+                    offset += actual_written;
+
+                    Self::Unknown {
+                        class: unknown_class,
+                        data: feature_data[..actual_written].to_vec(),
+                    }
                 }
             };
 
@@ -212,7 +240,7 @@ pub mod scroll_impl {
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
-            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>((&self).into(), &mut offset, ctx)?;
 
             match self {
                 Self::Common(common) => {
@@ -347,7 +375,7 @@ mod common_tests {
     }
 
     fn assert_class(dc: Class, v: u8) {
-        let as_u8: u8 = dc.into();
+        let as_u8: u8 = (&dc).into();
         assert_eq!(v, as_u8);
     }
 

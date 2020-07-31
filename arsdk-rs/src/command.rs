@@ -4,7 +4,7 @@ use crate::jumping_sumo;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Feature {
-    Common(common::Class),            // ARCOMMANDS_ID_FEATURE_COMMON = 0,
+    Common(Option<common::Class>),    // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     ArDrone3(Option<ArDrone3>),       // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
     Minidrone,                        // ARCOMMANDS_ID_FEATURE_MINIDRONE = 2,
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
@@ -22,12 +22,18 @@ pub enum Feature {
     ThermalCam,                       // ARCOMMANDS_ID_FEATURE_THERMAL_CAM = 142,
     Animation,                        // ARCOMMANDS_ID_FEATURE_ANIMATION = 144,
     SequoiaCam,                       // ARCOMMANDS_ID_FEATURE_SEQUOIA_CAM = 147,
-    /// UNKOWN 149 from anafi4k
+    /// Unknown 149 from anafi4k
     /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 14, feature: Some(Unknown { feature: 149, data: [0, 3, 0, 91, 33] }) }
-    /// Unknow 148 from anafi4k
+    /// Unknown 148 from anafi4k
     /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 5, feature: Some(Unknown { feature: 148, data: [0, 6, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 223, 46, 229, 182, 0, 0, 0, 0, 0, 0, 0, 0, 222, 4, 180, 66, 0, 0, 0, 128, 0, 0, 0, 0] }) }
-    /// Unknow 143 from anafi4k
+    /// Unknown 143 from anafi4k
     /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 4, feature: Some(Unknown { feature: 143, data: [0, 22, 0, 0, 0, 0, 128, 63] }) }
+    /// Unknown 155 from anafi4k
+    /// Frame { frame_type: Data, buffer_id: PING, sequence_id: 0, feature: Some(Unknown { feature: 155, data: [216, 221, 13, 0, 0, 0, 0] }) }
+    /// Unknown 56
+    /// Frame { frame_type: Data, buffer_id: PING, sequence_id: 1, feature: Some(Unknown { feature: 56, data: [129, 253, 13, 0, 0, 0, 0] }) }
+    /// Unknown 59
+    /// Frame { frame_type: Data, buffer_id: PING, sequence_id: 2, feature: Some(Unknown { feature: 59, data: [82, 29, 14, 0, 0, 0, 0] }) }
 
     /// Temporary Enum for storing unknown Features:
     /// TODO: REMOVE!
@@ -83,8 +89,14 @@ pub mod scroll_impl {
 
             let feature = match src.gread_with::<u8>(&mut offset, ctx)? {
                 0 => {
-                    let common = src.gread_with(&mut offset, ctx)?;
-                    Self::Common(common)
+                    let class = if !src[offset..].is_empty() {
+                        let common = src.gread_with(&mut offset, ctx)?;
+                        Some(common)
+                    } else {
+                        None
+                    };
+
+                    Self::Common(class)
                 }
                 1 => {
                     let ardrone3 = if !src[offset..].is_empty() {
@@ -185,7 +197,7 @@ mod command_tests {
     #[test]
     fn test_feature() {
         assert_feature(
-            Feature::Common(common::Class::Common(common::Common::AllStates)),
+            Feature::Common(Some(common::Class::Common(common::Common::AllStates))),
             0,
         );
         assert_feature(

@@ -5,7 +5,8 @@ pub enum JumpType {
     DEFAULT, // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+/// u8
 pub enum Class {
     Piloting(PilotingID), // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     PilotingState,        // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTINGSTATE = 1,
@@ -40,14 +41,15 @@ pub enum Anim {
     SimpleAnimation = 4, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
+/// u16
 pub enum PilotingID {
     Pilot(PilotState), // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_PCMD = 0,
     Posture,           // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_POSTURE = 1,
     AddCapOffset,      // ARCOMMANDS_ID_JUMPINGSUMO_PILOTING_CMD_ADDCAPOFFSET = 2,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 pub struct PilotState {
     pub flag: bool,
     pub speed: i8,
@@ -56,31 +58,31 @@ pub struct PilotState {
 
 // --------------------- Conversion impls --------------------- //
 
-impl Into<u8> for Class {
+impl Into<u8> for &Class {
     fn into(self) -> u8 {
         match self {
-            Self::Piloting(_) => 0,
-            Self::PilotingState => 1,
-            Self::Animations(_) => 2,
-            Self::AnimationsState => 3,
-            Self::SettingsState => 5,
-            Self::MediaRecord => 6,
-            Self::MediaRecordState => 7,
-            Self::NetworkSettings => 8,
-            Self::NetworkSettingsState => 9,
-            Self::Network => 10,
-            Self::NetworkState => 11,
-            Self::AutioSettings => 12,
-            Self::AudioSettingsState => 13,
-            Self::Roadplan => 14,
-            Self::RoadplanState => 15,
-            Self::SpeedSettings => 16,
-            Self::SpeedSettingsState => 17,
-            Self::MediaStreaming => 18,
-            Self::MediaStreamingState => 19,
-            Self::MediaRecordEvent => 20,
-            Self::VideoSettings => 21,
-            Self::VideoSettingsState => 22,
+            Class::Piloting(_) => 0,
+            Class::PilotingState => 1,
+            Class::Animations(_) => 2,
+            Class::AnimationsState => 3,
+            Class::SettingsState => 5,
+            Class::MediaRecord => 6,
+            Class::MediaRecordState => 7,
+            Class::NetworkSettings => 8,
+            Class::NetworkSettingsState => 9,
+            Class::Network => 10,
+            Class::NetworkState => 11,
+            Class::AutioSettings => 12,
+            Class::AudioSettingsState => 13,
+            Class::Roadplan => 14,
+            Class::RoadplanState => 15,
+            Class::SpeedSettings => 16,
+            Class::SpeedSettingsState => 17,
+            Class::MediaStreaming => 18,
+            Class::MediaStreamingState => 19,
+            Class::MediaRecordEvent => 20,
+            Class::VideoSettings => 21,
+            Class::VideoSettingsState => 22,
         }
     }
 }
@@ -97,12 +99,12 @@ impl Into<u8> for Anim {
     }
 }
 
-impl Into<u16> for PilotingID {
+impl Into<u16> for &PilotingID {
     fn into(self) -> u16 {
         match self {
-            Self::Pilot(_) => 0,
-            Self::Posture => 1,
-            Self::AddCapOffset => 2,
+            PilotingID::Pilot(_) => 0,
+            PilotingID::Posture => 1,
+            PilotingID::AddCapOffset => 2,
         }
     }
 }
@@ -167,7 +169,7 @@ pub mod scroll_impl {
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
 
-            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>((&self).into(), &mut offset, ctx)?;
             match self {
                 Self::Piloting(piloting_id) => {
                     this.gwrite_with(piloting_id, &mut offset, ctx)?;
@@ -214,7 +216,7 @@ pub mod scroll_impl {
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
-            this.gwrite_with::<u16>(self.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u16>((&self).into(), &mut offset, ctx)?;
 
             match self {
                 Self::Pilot(state) => {
@@ -315,6 +317,7 @@ pub mod scroll_impl {
 #[cfg(test)]
 mod jumping_dumo_tests {
     use super::*;
+    use std::borrow::Borrow;
 
     #[test]
     fn test_piloting_command() {
@@ -358,8 +361,8 @@ mod jumping_dumo_tests {
         assert_class(Class::VideoSettingsState, 22);
     }
 
-    fn assert_class(dc: Class, v: u8) {
-        let as_u8: u8 = dc.into();
+    fn assert_class(dc: impl Borrow<Class>, v: u8) {
+        let as_u8: u8 = dc.borrow().into();
         assert_eq!(v, as_u8);
     }
 
@@ -368,8 +371,8 @@ mod jumping_dumo_tests {
         assert_eq!(v, as_u8);
     }
 
-    fn assert_piloting(pc: PilotingID, v: u16) {
-        let as_u8: u16 = pc.into();
+    fn assert_piloting(pc: impl Borrow<PilotingID>, v: u16) {
+        let as_u8: u16 = pc.borrow().into();
         assert_eq!(v, as_u8);
     }
 }
