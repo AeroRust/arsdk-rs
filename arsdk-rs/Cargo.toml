@@ -1,11 +1,11 @@
 [package]
 name = "arsdk-rs"
 version = "0.0.5"
-authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>"]
+authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>", "Lachezar Lechev <elpiel93@gmail.com>"]
 edition = "2018"
-description = "parrot arsdk in rust"
+description = "Parrot drones SDK in Rust (AeroRust)"
 license = "MIT/Apache-2.0"
-keywords = ["drone", "parrot"]
+keywords = ["AeroRust", "drone", "parrot", "sdk"]
 
 [dependencies]
 thiserror = "1.0"
