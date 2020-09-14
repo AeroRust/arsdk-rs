@@ -3,6 +3,7 @@ use crate::common;
 use crate::jumping_sumo;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+/// u8
 pub enum Feature {
     Common(Option<common::Class>),    // ARCOMMANDS_ID_FEATURE_COMMON = 0,
     ArDrone3(Option<ArDrone3>),       // ARCOMMANDS_ID_FEATURE_ARDRONE3 = 1,
@@ -77,7 +78,7 @@ impl Into<u8> for &Feature {
 
 pub mod scroll_impl {
     use super::*;
-    use crate::frame::Error;
+    use crate::{frame::Error, parse::read_unknown};
     use scroll::{ctx, Endian, Pread, Pwrite};
 
     impl<'a> ctx::TryFromCtx<'a, Endian> for Feature {
@@ -137,19 +138,10 @@ pub mod scroll_impl {
                 // }
                 // Temporary Enum for storing unknown Features:
                 // TODO: REMOVE!
-                unknown_feature => {
-                    let mut feature_data = [0_u8; 256];
-                    let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
-
-                    assert_eq!(actual_written, feature_data[..actual_written].len());
-
-                    offset += actual_written;
-
-                    Self::Unknown {
-                        feature: unknown_feature,
-                        data: feature_data[..actual_written].to_vec(),
-                    }
-                }
+                unknown_feature => Self::Unknown {
+                    feature: unknown_feature,
+                    data: read_unknown(src, &mut offset)?,
+                },
             };
 
             Ok((feature, offset))

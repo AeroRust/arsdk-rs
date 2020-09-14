@@ -332,9 +332,12 @@ mod test {
             frame_type: Type::Data,
             buffer_id: BufferID::DCNavdata,
             sequence_id: 71,
-            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState {
-                data: received[32..].to_vec(),
-            }))),
+            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState(
+                ardrone3::PilotingState::Unknown {
+                    piloting_state: 4,
+                    data: received[34..].to_vec(),
+                },
+            )))),
         };
 
         assert_eq!(

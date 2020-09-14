@@ -1,5 +1,9 @@
 use chrono::{DateTime, Utc};
 
+mod piloting_state;
+
+pub use piloting_state::PilotingState;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 /// u8
 pub enum ArDrone3 {
@@ -11,69 +15,8 @@ pub enum ArDrone3 {
     PilotingSettings,
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_MEDIARECORDEVENT = 3
     MediaRecordEvent,
-    // /**
-    //  * @brief Drone landing state
-    //  */
-    // typedef enum
-    // {
-    //     ARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE_LINEAR = 0,    ///< Linear landing
-    //     ARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE_SPIRAL = 1,    ///< Spiral landing
-    //     ARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE_MAX
-    // } eARCOMMANDS_ARDRONE3_PILOTINGSTATE_LANDINGSTATECHANGED_STATE;
-    //
-    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddU16ToBuffer (buffer, ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_SPEEDCHANGED, currIndexInBuffer, buffLen);
-    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddFloatToBuffer (buffer, _speedX, currIndexInBuffer, buffLen);
-    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddFloatToBuffer (buffer, _speedY, currIndexInBuffer, buffLen);
-    // currIndexInBuffer = ARCOMMANDS_ReadWrite_AddFloatToBuffer (buffer, _speedZ, currIndexInBuffer, buffLen);
-    //
-    // typedef enum {
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_FLATTRIMCHANGED = 0,
-    //
-    //
-    //
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_FLYINGSTATECHANGED = 1,
-    // [2020-07-26T08:05:46Z DEBUG arsdk_rs::listener] Bytes: 4 126 0 15 0 0 0 1 4 1 0 7 0 0 0
-    // [2020-07-26T08:05:46Z INFO  arsdk_rs::parse] Frame: Frame { frame_type: DataWithAck, buffer_id: DCEvent, sequence_id: 0, feature: Some(ArDrone3(Some(Unknown { ardrone3: 4, data: [1, 0, 7, 0, 0, 0] }))) }
-    //
-    // Frame { frame_type: DataWithAck, buffer_id: DCEvent, sequence_id: 0, feature: Some(ArDrone3(Some(Unknown { ardrone3: 4, data: [1, 0, 0, 0, 0, 0] }))) }
-    // u16 [1, 0] - FLYINGSTATECHANGED
-    //
-    // ----------------------------------------------------------------------
-    //
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ALERTSTATECHANGED = 2,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_NAVIGATEHOMESTATECHANGED = 3,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_POSITIONCHANGED = 4,
-    //
-    //
-    //
-    //----------------------------------------------------------------------
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_SPEEDCHANGED = 5,
-    // Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 0, feature: Some(ArDrone3(Some(Unknown { ardrone3: 4, data: [5, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0] }))) }
-    // u16 [5, 0] - SPEEDCHANGED
-    // 3 x (4?) per float [0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0]
-    //
-    //----------------------------------------------------------------------
-    //
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ATTITUDECHANGED = 6,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_AUTOTAKEOFFMODECHANGED = 7,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ALTITUDECHANGED = 8,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_GPSLOCATIONCHANGED = 9,
-    //
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_LANDINGSTATECHANGED = 10,
-    // u16 [1, 0] - LANDINGSTATECHANGED
-    // u32 [0, 0, 0, 0] -
-    //
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_AIRSPEEDCHANGED = 11,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_MOVETOCHANGED = 12,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_MOTIONSTATE = 13,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_PILOTEDPOI = 14,
-    //     ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_RETURNHOMEBATTERYCAPACITY = 15,
-    // } eARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD;
-    //
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_PILOTINGSTATE = 4
-    PilotingState {
-        data: Vec<u8>,
-    },
+    PilotingState(PilotingState),
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_ANIMATIONS = 5
     Animations,
     /// ARCOMMANDS_ID_ARDRONE3_CLASS_PILOTINGSETTINGSSTATE = 6
@@ -251,7 +194,7 @@ pub enum GPSState {
     /// > feature: Some(Unknown { feature: 1, data: [31, 0, 0, 12] }) }
     /// u16 => ARCOMMANDS_ID_ARDRONE3_GPSSTATE_CMD_NUMBEROFSATELLITECHANGED = [0, 0]
     /// u8 => _numberOfSatellite = 12
-    NumberOfStatelitesChanged(u8),
+    NumberOfSatelliteChanged(u8),
     /// ARCOMMANDS_ID_ARDRONE3_GPSSTATE_CMD_HOMETYPEAVAILABILITYCHANGED = 1
     ///
     /// 1. Type (u32):
@@ -356,7 +299,7 @@ pub struct PCMD {
 
 pub mod scroll_impl {
     use super::*;
-    use crate::frame::Error;
+    use crate::{parse::read_unknown, frame::Error};
     use chrono::TimeZone;
     use scroll::{ctx, Endian, Pread, Pwrite};
 
@@ -376,17 +319,10 @@ pub mod scroll_impl {
                 // 2 => Self::PilotingSettings,
                 // 3 => Self::MediaRecordEvent,
                 4 => {
-                    let mut piloting_state_data = [0_u8; 256];
-                    let actual_written =
-                        piloting_state_data.gwrite_with(&src[offset..], &mut 0, ())?;
+                    let piloting_state = src.gread_with::<PilotingState>(&mut offset, ctx)?;
 
-                    assert_eq!(actual_written, piloting_state_data[..actual_written].len());
+                    Self::PilotingState(piloting_state)
 
-                    offset += actual_written;
-
-                    Self::PilotingState {
-                        data: piloting_state_data[..actual_written].to_vec(),
-                    }
                 }
                 // 5 => Self::Animations,
                 // 6 => Self::PilotingSettingsState,
@@ -420,17 +356,10 @@ pub mod scroll_impl {
                 //         param: "ArDrone3".to_string(),
                 //     })
                 // }
-                unknow_ardrone3 => {
-                    let mut feature_data = [0_u8; 256];
-                    let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
-
-                    assert_eq!(actual_written, feature_data[..actual_written].len());
-
-                    offset += actual_written;
-
+                unknown_ardrone3 => {
                     Self::Unknown {
-                        ardrone3: unknow_ardrone3,
-                        data: feature_data[..actual_written].to_vec(),
+                        ardrone3: unknown_ardrone3,
+                        data: read_unknown(src, &mut offset)?,
                     }
                 }
             };
@@ -456,8 +385,8 @@ pub mod scroll_impl {
                         this.gwrite_with::<u8>(enabled.into(), &mut offset, ctx)?;
                     } // _ => unimplemented!("Not all MediaStreaming options are impled!"),
                 },
-                Self::PilotingState { data } => {
-                    this.gwrite_with::<&[u8]>(data.as_slice(), &mut offset, ())?;
+                Self::PilotingState(piloting_state) => {
+                    this.gwrite_with(piloting_state, &mut offset, ctx)?;
                 }
                 _ => unimplemented!("Not all ArDrone3 Classes are impled!"),
             }

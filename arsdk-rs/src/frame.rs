@@ -260,7 +260,7 @@ impl fmt::Display for BufferID {
 
 pub mod impl_scroll {
     use super::*;
-    use crate::command::Feature;
+    use crate::{command::Feature, parse::read_unknown};
 
     use scroll::{ctx, Endian, Pread, Pwrite};
 
@@ -274,16 +274,10 @@ pub mod impl_scroll {
             match src.gread_with(&mut actual_buf_len, ctx) {
                 Ok(frame) => Ok((FrameType::Known(frame), actual_buf_len)),
                 Err(Error::OutOfBound { param, value }) => {
-                    let mut data = [0_u8; 256];
-                    let actual_written = data.gwrite_with(&src[actual_buf_len..], &mut 0, ())?;
-
-                    assert_eq!(actual_written, data[..actual_written].len());
-
-                    actual_buf_len += actual_written;
                     let unknown_frame = FrameType::Unknown(UnknownFrame {
                         key: param,
                         value,
-                        data: data[..actual_written].to_vec(),
+                        data: read_unknown(src, &mut 0)?,
                     });
                     Ok((unknown_frame, actual_buf_len))
                 }
@@ -465,7 +459,7 @@ pub mod impl_scroll {
 mod frame_tests {
     use super::*;
     use crate::{
-        ardrone3::ArDrone3,
+        ardrone3::{self, ArDrone3},
         common::{self, Class as CommonClass},
         jumping_sumo::*,
     };
@@ -635,13 +629,37 @@ mod frame_tests {
     }
 
     #[test]
+    #[ignore = "We've received it from Anafi4k and it doesn't make sense atm"]
+    /// [1] Type::Ack
+    /// [139] BufferID::ACKFromSendWithAck
+    /// [4] Sequence ID
+    /// [8, 0, 0, 0] 8 length
+    /// [3] Jumping Sumo
+    fn test_unknown_jumping_sumo_feature_from_anafi() {
+        let message: [u8; 8] = [1, 139, 4, 8, 0, 0, 0, 3];
+
+        let frame = Frame {
+            frame_type: Type::Ack,
+            buffer_id: BufferID::ACKFromSendWithAck,
+            sequence_id: 4,
+            feature: Some(Feature::Unknown {
+                feature: 3,
+                data: vec![],
+            }),
+        };
+
+        assert_frames_match(&message, frame);
+    }
+
+    #[test]
     /// [2] Type::Data
     /// [127] BufferID::DCNavadata
     /// [206] Sequence ID
     /// [15, 0, 0, 0] 15 length
-    /// [1] ArDrone
+    /// [1] ArDrone3
     /// [4] Piloting state
-    /// [21, 0, 126, 163, 163, 64] Data?
+    /// [21, 0]
+    /// [126, 163, 163, 64] Data?
     fn test_unknown_ardrone3_piloting_state_feature() {
         let message: [u8; 15] = [2, 127, 206, 15, 0, 0, 0, 1, 4, 21, 0, 126, 163, 163, 64];
 
@@ -649,9 +667,12 @@ mod frame_tests {
             frame_type: Type::Data,
             buffer_id: BufferID::DCNavdata,
             sequence_id: 206,
-            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState {
-                data: message[9..].to_vec(),
-            }))),
+            feature: Some(Feature::ArDrone3(Some(ArDrone3::PilotingState(
+                ardrone3::PilotingState::Unknown {
+                    piloting_state: 21,
+                    data: message[11..].to_vec(),
+                },
+            )))),
         };
 
         assert_frames_match(&message, frame);
