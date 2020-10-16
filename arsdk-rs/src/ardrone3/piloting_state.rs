@@ -117,6 +117,8 @@ pub mod scroll_impl {
         // and the lifetime annotation on `&'a [u8]` here
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
+
+            #[allow(clippy::match_single_binding)]
             let piloting_state = match src.gread_with::<u16>(&mut offset, ctx)? {
                 unknown => Self::Unknown {
                     piloting_state: unknown,

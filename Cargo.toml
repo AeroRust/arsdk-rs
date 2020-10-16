@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "arsdk-rs",
-    "arsdk-serde",
     "jumpingsumo-rs",
     "bebop2",
     # "anafi-rs",
