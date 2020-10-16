@@ -85,6 +85,7 @@ pub enum Class {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+/// u8
 pub enum Common {
     /// ARCOMMANDS_ID_COMMON_COMMON_CMD_ALLSTATES = 0,
     AllStates,
@@ -216,19 +217,10 @@ pub mod scroll_impl {
                 // 31 => Self::Factory,
                 // 32 => Self::FlightPlanSettings,
                 // 33 => Self::FlightPlanSettingsState,
-                unknown_class => {
-                    let mut feature_data = [0_u8; 256];
-                    let actual_written = feature_data.gwrite_with(&src[offset..], &mut 0, ())?;
-
-                    assert_eq!(actual_written, feature_data[..actual_written].len());
-
-                    offset += actual_written;
-
-                    Self::Unknown {
-                        class: unknown_class,
-                        data: feature_data[..actual_written].to_vec(),
-                    }
-                }
+                unknown_class => Self::Unknown {
+                    class: unknown_class,
+                    data: crate::parse::read_unknown(src, &mut offset)?,
+                },
             };
 
             Ok((class, offset))

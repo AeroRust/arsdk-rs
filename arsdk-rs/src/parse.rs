@@ -4,7 +4,7 @@ use crate::{
     print_buf, Drone, FrameType,
 };
 use log::{error, info};
-use scroll::{Pread, LE};
+use scroll::{Pread, Pwrite, LE};
 
 /// - Parses Frames
 /// - Sends PING response to cmd Sender
@@ -78,6 +78,18 @@ pub(crate) fn parse_message_frames(buf: &[u8]) -> Vec<Result<FrameType, Error>> 
     }
 
     frames
+}
+
+/// Helper function to read unknown / not implemented Frames
+pub(crate) fn read_unknown(src: &[u8], offset: &mut usize) -> Result<Vec<u8>, crate::frame::Error> {
+    let mut feature_data = [0_u8; 256];
+    let actual_written = feature_data.gwrite_with(&src[*offset..], &mut 0, ())?;
+
+    assert_eq!(actual_written, feature_data[..actual_written].len());
+
+    *offset += actual_written;
+
+    Ok(feature_data[..actual_written].to_vec())
 }
 
 #[cfg(test)]
@@ -163,6 +175,7 @@ mod parse_message_frames {
     }
 
     #[test]
+
     /// [2] Type - Data
     /// [0] BufferID - Ping
     /// [1] Sequence id 1
@@ -173,10 +186,10 @@ mod parse_message_frames {
     /// [4] Type - DataWithAck
     /// [126] BufferID - DCEvent
     /// [1] Sequence id 1
-    /// [12, 0, 0, 0 ] Length 12
+    /// [12, 0, 0, 0] Length 12
     /// [0] Feature - Common
     /// [14] Class - CalibrationState
-    /// [1, 0 , 0] - DATA?!
+    /// [1, 0, 0] - x y z axis
     ///
     fn test_two_frames_ping_and_common_class_calibration_state_unknown() {
         let buf: [u8; 35] = [

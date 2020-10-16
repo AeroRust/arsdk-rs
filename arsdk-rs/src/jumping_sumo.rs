@@ -1,4 +1,7 @@
+// use arsdk_derive::FramePart;
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+// TODO: Check where and how this is encoded?
 pub enum JumpType {
     LONG,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
     HIGH,    // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_PILOTING = 0,
@@ -32,13 +35,14 @@ pub enum Class {
     VideoSettingsState,   // ARCOMMANDS_ID_JUMPINGSUMO_CLASS_VIDEOSETTINGSSTATE = 22,
 }
 
+// #[derive(Debug, PartialEq, Eq, Clone, Copy, FramePart)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Anim {
-    JumpStop = 0,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPSTOP = 0,
-    JumpCancel = 1,      // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPCANCEL = 1,
-    JumpLoad = 2,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPLOAD = 2,
-    Jump = 3,            // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMP = 3,
-    SimpleAnimation = 4, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
+    JumpStop,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPSTOP = 0,
+    JumpCancel,      // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPCANCEL = 1,
+    JumpLoad,        // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMPLOAD = 2,
+    Jump,            // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_JUMP = 3,
+    SimpleAnimation, // ARCOMMANDS_ID_JUMPINGSUMO_ANIMATIONS_CMD_SIMPLEANIMATION = 4,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -302,7 +306,7 @@ pub mod scroll_impl {
 
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset: usize = 0;
-            this.gwrite_with::<u8>(self.into(), &mut offset, ctx)?;
+            this.gwrite_with::<u8>((self).into(), &mut offset, ctx)?;
             // TODO: FIX THIS!
             let dummy_anim = [0_u8; 5];
             this.gwrite_with(dummy_anim.as_ref(), &mut offset, ())?;
