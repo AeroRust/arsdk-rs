@@ -9,6 +9,54 @@
 
 ### Not released yet
 
+## Useful information related to the official C SDK
+
+### Commands:
+
+Id's of the commands and their values can be found in the file: `build/libARCommands/libARCommands/ARCOMMANDS_Ids.h`
+
+
+### Filters:
+
+@TODO Figure out what the Filters actually do.
+
+`eARCOMMANDS_FILTER_STATUS ARCOMMANDS_Filter_FilterCommand (ARCOMMANDS_Filter_t *filter, uint8_t *buffer, uint32_t len, eARCOMMANDS_FILTER_ERROR *error)` found in `build/libARCommands/gen/Sources/ARCOMMANDS_Filter.c` has 3 parameters in the order:
+
+1. `commandFeature = ARCOMMANDS_ReadWrite_Read8FromBuffer`
+2. `commandClass = ARCOMMANDS_ReadWrite_Read8FromBuffer`
+3. `commandId = ARCOMMANDS_ReadWrite_Read16FromBuffer`
+
+Based on these parameters it triggers a filter behavior, e.g.:
+    `filter->CmdGenericDefaultBehavior`
+
+```c
+/**
+ * @brief Status code for ARCOMMANDS_Filter_FilterCommand function
+ */
+typedef enum {
+    ARCOMMANDS_FILTER_STATUS_ALLOWED = 0, ///< The command should pass the filter
+    ARCOMMANDS_FILTER_STATUS_BLOCKED, ///< The command should not pass the filter
+    ARCOMMANDS_FILTER_STATUS_UNKNOWN, ///< Unknown command. The command was possibly added in a newer version of libARCommands, or is an invalid command.
+    ARCOMMANDS_FILTER_STATUS_ERROR, ///< The filtering of the command failed.
+} eARCOMMANDS_FILTER_STATUS;
+
+/**
+ * @brief ARCOMMANDS_Filter object holder
+ */
+typedef struct ARCOMMANDS_Filter_t ARCOMMANDS_Filter_t;
+
+/**
+ * @brief Creates a new ARCOMMANDS_Filter_t
+ * @param defaultBehavior The default behavior of the filter (must be either ARCOMMANDS_FILTER_STATUS_BLOCKED or ARCOMMANDS_FILTER_STATUS_ALLOWED).
+ * @param error Optionnal pointer which will hold the error code.
+ * @warning This function allocates memory.
+ * @note The memory must be freed by a call to ARCOMMANDS_Filter_DeleteFilter.
+ * @return A new ARCOMMANDS_Filter_t instance. NULL in case of error.
+ */
+ARCOMMANDS_Filter_t* ARCOMMANDS_Filter_NewFilter (eARCOMMANDS_FILTER_STATUS defaultBehavior, eARCOMMANDS_FILTER_ERROR *error);
+```
+
+
 ## Sphinx simulator
 
 https://developer.parrot.com/docs/sphinx/
@@ -70,9 +118,9 @@ NOTE: It doesn't currently work.
 Bebop2 (double check): rtsp://10.202.0.1/media/stream2
 Anafi4k: rtsp://10.202.0.1/live
 
-### Telemetery
+### Telemetry
 
-Documetation:
+Documentation:
 * https://developer.parrot.com/docs/sphinx/visualization.html#tlm-data-logger
 
 

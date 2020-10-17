@@ -11,7 +11,14 @@ pub enum Feature {
     JumpingSumo(jumping_sumo::Class), // ARCOMMANDS_ID_FEATURE_JUMPINGSUMO = 3,
     SkyController,                    // ARCOMMANDS_ID_FEATURE_SKYCONTROLLER = 4,
     PowerUp,                          // ARCOMMANDS_ID_FEATURE_POWERUP = 8,
-    Generic,                          // ARCOMMANDS_ID_FEATURE_GENERIC = 133,
+    /// ARCOMMANDS_ID_FEATURE_GENERIC = 133,
+    ///
+    /// For details on the Generic check:
+    /// 1. `ARCOMMANDS_ID_GENERIC_COMMONEVENTSTATE_CMD_SETDRONESETTINGS` in `libARCommands/gen/Sources/ARCOMMANDS_Decoder.c`
+    /// 2.``ARCOMMANDS_ID_GENERIC_CMD_DRONESETTINGSCHANGED` in `libARCommands/gen/Sources/ARCOMMANDS_Decoder.c`
+    /// 3. `ARCOMMANDS_Generic_DroneSettings_t` in `libARCommands/libARCommands/ARCOMMANDS_Types.h`
+    /// 4. `ARCOMMANDS_Generic_DroneSettingsChanged_t` in `libARCommands/libARCommands/ARCOMMANDS_Types.h`
+    Generic,
     FollowMe,                         // ARCOMMANDS_ID_FEATURE_FOLLOW_ME = 134,
     Wifi,                             // ARCOMMANDS_ID_FEATURE_WIFI = 135,
     RC,                               // ARCOMMANDS_ID_FEATURE_RC = 136,
