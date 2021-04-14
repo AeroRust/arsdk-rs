@@ -1,6 +1,18 @@
 # arsdk-rs   [![crates.io](https://img.shields.io/crates/v/arsdk-rs.svg)](https://crates.io/crates/arsdk-rs) [![Documentation](https://docs.rs/arsdk-rs/badge.svg)](https://docs.rs/arsdk-rs) [![MPL 2.0 License](https://img.shields.io/badge/license-apache2-green.svg)](LICENSE-APACHE) [![MIT License](https://img.shields.io/badge/license-mit-blue.svg)](LICENSE-MIT)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
+## 🛠 Project status: Proof of concept
+
+This project was a Proof of concept Software Development Kit for Parrot drones.
+
+Due to the recent development and the pivotting of the Parrot company, we've moved our efforts to a new Open-source project called MAVLink.
+MAVLink is a messaging protocol that is compatible with multiple autopilots (PX4, ArduPilot), multiple hardware and there are many open-source projects build around it to support different aspect of controlling drones, planes and marien and other vehicles.
+
+## ℹ Resources
+- AeroRust mav repository: https://github.com/AeroRust/mav
+- PX4: https://px4.io
+- ArduPilot: https://ardupilot.org
+- MAVLink: https://mavlink.io
 
 
 ## jumpingsumo-rs   [![crates.io](https://img.shields.io/crates/v/jumpingsumo-rs.svg)](https://crates.io/crates/jumpingsumo-rs) [![Documentation](https://docs.rs/jumpingsumo-rs/badge.svg)](https://docs.rs/jumpingsumo-rs)
