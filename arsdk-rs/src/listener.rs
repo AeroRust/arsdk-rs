@@ -11,7 +11,7 @@ impl Listener {
     /// Blocking listener in a infinite loop
     pub fn listen(&self) {
         loop {
-            let mut buf = [0_u8; 256];
+            let mut buf = [0_u8; 40960];
             if let Ok((bytes_read, origin)) = self.socket.recv_from(&mut buf) {
                 debug!("Received: {} bytes from {}", bytes_read, origin);
                 debug!("Bytes: {}", print_buf(&buf[..bytes_read]));

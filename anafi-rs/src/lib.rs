@@ -31,12 +31,7 @@ impl Anafi {
     pub fn take_off(&self) -> Result<(), Error> {
         let feature = Feature::ArDrone3(Some(ArDrone3::Piloting(Piloting::TakeOff)));
 
-        let frame = Frame::for_drone(
-            &self.drone,
-            Type::DataWithAck,
-            BufferID::CDAck,
-            Some(feature),
-        );
+        let frame = Frame::for_drone(&self.drone, Type::Data, BufferID::CDNonAck, Some(feature));
 
         self.drone.send_frame(frame)
     }
@@ -76,12 +71,7 @@ impl Anafi {
     pub fn landing(&self) -> Result<(), Error> {
         let feature = Feature::ArDrone3(Some(ArDrone3::Piloting(Piloting::Landing)));
 
-        let frame = Frame::for_drone(
-            &self.drone,
-            Type::DataWithAck,
-            BufferID::CDAck,
-            Some(feature),
-        );
+        let frame = Frame::for_drone(&self.drone, Type::Data, BufferID::CDNonAck, Some(feature));
 
         self.drone.send_frame(frame)
     }
