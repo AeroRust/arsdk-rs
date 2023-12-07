@@ -20,15 +20,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     drone.up()?;
     std::thread::sleep(Duration::from_secs(2));
 
-    // log::warn!("forward!");
-    // drone.forward()?;
-    // std::thread::sleep(Duration::from_secs(1));
-    // drone.stop()?;
+    log::warn!("forward!");
+    drone.forward()?;
+    std::thread::sleep(Duration::from_secs(1));
+    drone.stop()?;
 
-    // log::warn!("backward!");
-    // drone.backward()?;
-    // std::thread::sleep(Duration::from_secs(1));
-    // drone.stop()?;
+    log::warn!("backward!");
+    drone.backward()?;
+    std::thread::sleep(Duration::from_secs(1));
+    drone.stop()?;
 
     log::warn!("left!");
     drone.strafe_left()?;
@@ -38,17 +38,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     drone.strafe_right()?;
     std::thread::sleep(Duration::from_secs(1));
 
-    // log::warn!("turn left!");
-    // for _ in 0..30 {
-    //     drone.turn_left()?;
-    //     std::thread::sleep(Duration::from_millis(300));
-    // }
+    log::warn!("turn left!");
+    for _ in 0..30 {
+        drone.turn_left()?;
+        std::thread::sleep(Duration::from_millis(300));
+    }
 
-    // log::warn!("turn right!");
-    // for _ in 0..30 {
-    //     drone.turn_right()?;
-    //     std::thread::sleep(Duration::from_millis(300));
-    // }
+    log::warn!("turn right!");
+    for _ in 0..30 {
+        drone.turn_right()?;
+        std::thread::sleep(Duration::from_millis(300));
+    }
 
     log::warn!("DOWN!");
     drone.down()?;
