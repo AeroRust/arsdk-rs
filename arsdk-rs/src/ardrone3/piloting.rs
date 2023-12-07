@@ -120,7 +120,7 @@ mod scroll_impl {
                 Piloting::PCMD(pcmd) => {
                     this.gwrite_with(pcmd, &mut offset, ctx)?;
                 }
-                // Piloting::Landing => {}
+                Piloting::Landing => {}
                 // Piloting::Emergency => {}
                 // Piloting::NavigateHome => {}
                 // Piloting::AutoTakeOffMode => {}

@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_with::with_prefix;
 use std::{
@@ -17,7 +17,7 @@ pub(crate) struct Request {
     pub arstream2: Option<ArStream2>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 /// Request: "{\"controller_name\":\"arsdk-rs\",\"controller_type\":\"computer\",\"d2c_port\":43210}"
 /// Response: "{ \"status\": 0, \"c2d_port\": 54321, \"c2d_update_port\": 51, \"c2d_user_port\": 21, \"qos_mode\": 0, \"arstream2_server_stream_port\": 5004, \"arstream2_server_control_port\": 5005 }\u{0}"
 /// `\u{0}` causes issues, but for now we `trim_end_matches`
@@ -72,7 +72,7 @@ pub(crate) fn perform_handshake(
     d2c_port: u16,
 ) -> Result<Response, Error> {
     let request = Request {
-        controller_name: "arsdk-rs".to_string(),
+        controller_name: "desktop".to_string(),
         controller_type: "computer".to_string(),
         d2c_port,
         // Anafi4k:
@@ -92,18 +92,18 @@ pub(crate) fn perform_handshake(
 
     let mut handshake_stream = retry(10, init_address)?;
 
-    info!("Request: {}", serde_json::to_string(&request)?);
+    debug!("Request: {}", serde_json::to_string(&request)?);
     let request_string = serde_json::to_vec(&request)?;
 
     handshake_stream.write_all(&request_string)?;
 
-    let mut buf = [0_u8; 256];
+    let mut buf = [0_u8; 1024];
     let read = handshake_stream.read(&mut buf)?;
-    info!("Read {} bytes!", read);
+    debug!("Read {} bytes!", read);
 
     let response_string = String::from_utf8(buf[..read].to_vec())?;
 
-    info!("Response: {}", response_string);
+    debug!("Response: {}", response_string);
 
     handshake_stream.shutdown(Shutdown::Both)?;
 

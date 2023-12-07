@@ -3,7 +3,7 @@ use crate::{
     frame::{BufferID, Error, Frame, Type},
     print_buf, Drone, FrameType,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use scroll::{Pread, Pwrite, LE};
 
 /// - Parses Frames
@@ -14,12 +14,16 @@ pub(crate) fn handle_bytes(drone: &Drone, raw_frames: &[u8]) {
 
     for result in frames.iter() {
         match result {
-            Ok(FrameType::Known(frame)) => info!("Frame: {:?}", frame),
+            Ok(FrameType::Known(Frame {
+                feature: Some(Feature::ArDrone3(Some(ardrone_3))),
+                ..
+            })) => info!("Ardrone3 Frame: {:?}", ardrone_3),
+            Ok(FrameType::Known(frame)) => debug!("Frame: {:?}", frame),
             Ok(FrameType::Unknown(unknown)) => {
-                info!("Unknown Frame: {:?}", unknown);
-                info!("Bytes: {}", print_buf(raw_frames));
+                error!("Unknown Frame: {:?}", unknown);
+                error!("Bytes: {}", print_buf(raw_frames));
             }
-            Err(err) => error!("Receiving Frame: {:?}", err),
+            Err(err) => debug!("Receiving Frame: {:?}", err),
         }
     }
 
@@ -66,7 +70,7 @@ pub(crate) fn parse_message_frames(buf: &[u8]) -> Vec<Result<FrameType, Error>> 
     let mut offset = 0;
     // TODO: Check how many frames can we receive at once
     // reasonable given that we receive at most (MAYBE?!) 2 frames
-    let mut frames = Vec::with_capacity(3);
+    let mut frames = Vec::with_capacity(10);
 
     let mut tried = 1;
     // try to read all the buf length & limit to 3 Frames of read

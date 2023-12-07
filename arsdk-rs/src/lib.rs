@@ -1,7 +1,7 @@
 use crate::frame::{Frame, FrameType};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
-use log::{error, info};
+use log::{debug, error, info, trace};
 use pnet::datalink;
 use scroll::{ctx::TryIntoCtx, Pread, LE};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
@@ -15,7 +15,6 @@ use thiserror::Error;
 pub use chrono;
 
 pub const INIT_PORT: u16 = 44444;
-pub const LISTEN_PORT: u16 = 43210;
 pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
 pub const PARROT_SPHINX_CONFIG: Config = Config {
     drone_addr: PARROT_SPHINX_IP,
@@ -94,6 +93,13 @@ where
 #[derive(Clone, Debug)]
 pub struct Drone {
     inner: Arc<DroneInner>,
+    shutdown_sender: SyncSender<()>,
+}
+
+impl Drop for Drone {
+    fn drop(&mut self) {
+        let _ = self.shutdown_sender.send(());
+    }
 }
 
 #[derive(Debug)]
@@ -116,26 +122,36 @@ impl Drone {
         // @TODO: Check if we're going to miss any messages between spawning the listener and the receiver of commands
         let (tx_cmd, rx_cmd) = sync_channel(200);
 
+        let (shutdown_sender, shutdown_receiver) = sync_channel(1);
+
         let drone = Self {
             inner: Arc::new(DroneInner {
                 sequence_ids: DashMap::new(),
                 sender: tx_cmd,
             }),
+            shutdown_sender,
         };
 
-        let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
-        info!("{}: Spawning Listener", &&local_listener);
-
-        spawn_listener(drone.clone(), local_listener)?;
+        let local_listener = spawn_listener(
+            drone.clone(),
+            SocketAddr::new(local_ip, 0), // let kernel decide which port is available
+            shutdown_receiver,
+        )?;
+        info!("{}: Spawned Listener", &local_listener);
 
         let init_addr = SocketAddr::new(config.drone_addr, INIT_PORT);
 
         info!("Init address {}", &init_addr);
 
         let handshake_response = perform_handshake(init_addr, local_listener.port())?;
+
+        log::debug!(
+            "handshake_response: \n{}",
+            serde_json::to_string_pretty(&handshake_response).unwrap()
+        );
         let cmd_sender_target = SocketAddr::new(config.drone_addr, handshake_response.c2d_port);
 
-        info!("{}: Spawning CMD Sender", cmd_sender_target);
+        debug!("{}: Spawning CMD Sender", cmd_sender_target);
 
         spawn_cmd_sender(rx_cmd, local_ip, cmd_sender_target)?;
 
@@ -147,7 +163,7 @@ impl Drone {
     }
 
     pub fn send_frame(&self, frame: frame::Frame) -> Result<(), Error> {
-        let mut raw_message = [0_u8; 2048];
+        let mut raw_message = [0_u8; 128];
         let written = frame.try_into_ctx(&mut raw_message, LE)?;
 
         self.send_raw_message(&raw_message[0..written])
@@ -193,10 +209,16 @@ impl Drone {
 
         self.send_frame(pong)
     }
+
+    pub fn piloting_id(&self) -> u8 {
+        self.inner.sequence_id(frame::BufferID::CDNonAck)
+    }
 }
 
 impl DroneInner {
     pub(crate) fn sequence_id(&self, buffer_id: frame::BufferID) -> u8 {
+        // each buffer has its own independant sequence number,
+        // which should be increased on new data send, but not on retries
         if let Some(mut sequence_id) = self.sequence_ids.get_mut(&buffer_id) {
             let command_id = *sequence_id;
             *sequence_id = sequence_id.overflowing_add(1).0;
@@ -218,9 +240,17 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
         .next()
 }
 
-fn spawn_listener(drone: Drone, addr: SocketAddr) -> Result<(), ConnectionError> {
+fn spawn_listener(
+    drone: Drone,
+    addr: SocketAddr,
+    shutdown_receiver: Receiver<()>,
+) -> Result<SocketAddr, ConnectionError> {
     let listener_socket =
         UdpSocket::bind(addr).map_err(|error| ConnectionError::Io { error, addr })?;
+
+    let addr = listener_socket
+        .local_addr()
+        .map_err(|error| ConnectionError::Io { error, addr })?;
 
     std::thread::spawn(move || {
         let listener = Listener {
@@ -228,10 +258,10 @@ fn spawn_listener(drone: Drone, addr: SocketAddr) -> Result<(), ConnectionError>
             socket: listener_socket,
         };
 
-        listener.listen();
+        listener.listen(shutdown_receiver);
     });
 
-    Ok(())
+    Ok(addr)
 }
 
 pub(crate) fn print_buf(buf: &[u8]) -> String {
@@ -262,11 +292,24 @@ fn spawn_cmd_sender(
             }
         };
 
-        info!("Frame to sent: {:?}", &frame_to_send);
+        // ACK
+        if frame_to_send[0] == 1 {
+            trace!("Frame to send: {:?}", &frame_to_send);
+        } else {
+            log::debug!(
+                "Frame to send: {}: {:?}",
+                &frame_to_send
+                    .iter()
+                    .map(|n| format!("{:#b}", n))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                &frame_to_send
+            );
+        }
 
         let frame = frame_to_send.pread_with::<Frame>(0, LE);
 
-        info!(
+        debug!(
             "Sent Frame (length: {}) => {:?}",
             frame_to_send.len(),
             &frame
@@ -287,7 +330,7 @@ fn spawn_cmd_sender(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::parse::parse_message_frames;
+    use crate::{ardrone3::Piloting, parse::parse_message_frames};
     use ardrone3::ArDrone3;
     use command::Feature;
     use frame::{BufferID, Type};
@@ -364,5 +407,27 @@ mod test {
             2, 127, 26, 23, 0, 0, 0, 1, 4, 5, 0, 22, 144, 125, 184, 167, 42, 112, 58, 252, 101, 132,
             185,
         ];
+    }
+
+    #[test]
+    fn send_takeoff_command() {
+        let feature = Feature::ArDrone3(Some(ArDrone3::Piloting(Piloting::TakeOff)));
+
+        let frame = Frame::new(Type::Data, BufferID::CDNonAck, 42, Some(feature));
+
+        let mut raw_message = [0_u8; 128];
+        let written = frame.try_into_ctx(&mut raw_message, LE).unwrap();
+
+        let expected: [u8; 11] = [
+            2,  // frametype data
+            10, // buffer id cdnonack
+            42, // sequence number,
+            11, 0, 0, 0, // size, (4 bytes, little endian)
+            1, // feature Ardrone3
+            0, // piloting
+            1, 0, // takeoff, two bytes
+        ];
+
+        assert_eq!(&expected, &raw_message[..written]);
     }
 }

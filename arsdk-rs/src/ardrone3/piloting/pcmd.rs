@@ -10,7 +10,6 @@ pub struct PCMD {
     pub yaw: i8,
     pub gaz: i8,
     pub timestamp: DateTime<Utc>,
-    // TODO: How should we handle the `sequence_id` in order not to show it to the user?
     pub sequence_id: u8,
 }
 

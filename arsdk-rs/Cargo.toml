@@ -1,7 +1,10 @@
 [package]
 name = "arsdk-rs"
 version = "0.0.5"
-authors = ["o0Ignition0o <jeremy.lempereur@gmail.com>", "Lachezar Lechev <elpiel93@gmail.com>"]
+authors = [
+    "o0Ignition0o <jeremy.lempereur@gmail.com>",
+    "Lachezar Lechev <elpiel93@gmail.com>",
+]
 edition = "2018"
 description = "Parrot drones SDK in Rust (AeroRust)"
 license = "MIT/Apache-2.0"
@@ -9,8 +12,8 @@ keywords = ["AeroRust", "drone", "parrot", "sdk"]
 
 [dependencies]
 thiserror = "1.0"
-pnet = "0.25"
-serde = {version = "1.0", features = ["derive"]}
+pnet = "0.26"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "1"
 dashmap = "3.11"
