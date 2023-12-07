@@ -15,7 +15,6 @@ use thiserror::Error;
 pub use chrono;
 
 pub const INIT_PORT: u16 = 44444;
-pub const LISTEN_PORT: u16 = 43210;
 pub const PARROT_SPHINX_IP: IpAddr = IpAddr::V4(Ipv4Addr::new(10, 202, 0, 1));
 pub const PARROT_SPHINX_CONFIG: Config = Config {
     drone_addr: PARROT_SPHINX_IP,
@@ -94,6 +93,13 @@ where
 #[derive(Clone, Debug)]
 pub struct Drone {
     inner: Arc<DroneInner>,
+    shutdown_sender: SyncSender<()>,
+}
+
+impl Drop for Drone {
+    fn drop(&mut self) {
+        let _ = self.shutdown_sender.send(());
+    }
 }
 
 #[derive(Debug)]
@@ -116,17 +122,22 @@ impl Drone {
         // @TODO: Check if we're going to miss any messages between spawning the listener and the receiver of commands
         let (tx_cmd, rx_cmd) = sync_channel(200);
 
+        let (shutdown_sender, shutdown_receiver) = sync_channel(1);
+
         let drone = Self {
             inner: Arc::new(DroneInner {
                 sequence_ids: DashMap::new(),
                 sender: tx_cmd,
             }),
+            shutdown_sender,
         };
 
-        let local_listener = SocketAddr::new(local_ip, LISTEN_PORT);
-        info!("{}: Spawning Listener", &&local_listener);
-
-        spawn_listener(drone.clone(), local_listener)?;
+        let local_listener = spawn_listener(
+            drone.clone(),
+            SocketAddr::new(local_ip, 0), // let kernel decide which port is available
+            shutdown_receiver,
+        )?;
+        info!("{}: Spawned Listener", &local_listener);
 
         let init_addr = SocketAddr::new(config.drone_addr, INIT_PORT);
 
@@ -198,6 +209,10 @@ impl Drone {
 
         self.send_frame(pong)
     }
+
+    pub fn piloting_id(&self) -> u8 {
+        self.inner.sequence_id(frame::BufferID::CDNonAck)
+    }
 }
 
 impl DroneInner {
@@ -225,9 +240,17 @@ fn local_ip(target: IpAddr) -> Option<IpAddr> {
         .next()
 }
 
-fn spawn_listener(drone: Drone, addr: SocketAddr) -> Result<(), ConnectionError> {
+fn spawn_listener(
+    drone: Drone,
+    addr: SocketAddr,
+    shutdown_receiver: Receiver<()>,
+) -> Result<SocketAddr, ConnectionError> {
     let listener_socket =
         UdpSocket::bind(addr).map_err(|error| ConnectionError::Io { error, addr })?;
+
+    let addr = listener_socket
+        .local_addr()
+        .map_err(|error| ConnectionError::Io { error, addr })?;
 
     std::thread::spawn(move || {
         let listener = Listener {
@@ -235,10 +258,10 @@ fn spawn_listener(drone: Drone, addr: SocketAddr) -> Result<(), ConnectionError>
             socket: listener_socket,
         };
 
-        listener.listen();
+        listener.listen(shutdown_receiver);
     });
 
-    Ok(())
+    Ok(addr)
 }
 
 pub(crate) fn print_buf(buf: &[u8]) -> String {
@@ -273,7 +296,7 @@ fn spawn_cmd_sender(
         if frame_to_send[0] == 1 {
             trace!("Frame to send: {:?}", &frame_to_send);
         } else {
-            log::warn!(
+            log::debug!(
                 "Frame to send: {}: {:?}",
                 &frame_to_send
                     .iter()

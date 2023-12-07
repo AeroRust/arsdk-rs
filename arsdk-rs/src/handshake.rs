@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_with::with_prefix;
 use std::{
@@ -92,18 +92,18 @@ pub(crate) fn perform_handshake(
 
     let mut handshake_stream = retry(10, init_address)?;
 
-    info!("Request: {}", serde_json::to_string(&request)?);
+    debug!("Request: {}", serde_json::to_string(&request)?);
     let request_string = serde_json::to_vec(&request)?;
 
     handshake_stream.write_all(&request_string)?;
 
     let mut buf = [0_u8; 1024];
     let read = handshake_stream.read(&mut buf)?;
-    info!("Read {} bytes!", read);
+    debug!("Read {} bytes!", read);
 
     let response_string = String::from_utf8(buf[..read].to_vec())?;
 
-    info!("Response: {}", response_string);
+    debug!("Response: {}", response_string);
 
     handshake_stream.shutdown(Shutdown::Both)?;
 
