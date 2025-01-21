@@ -12,7 +12,6 @@ keywords = ["AeroRust", "drone", "parrot", "sdk"]
 
 [dependencies]
 thiserror = "1.0"
-pnet = "0.26"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_with = "1"
@@ -20,3 +19,4 @@ dashmap = "3.11"
 chrono = "0.4"
 scroll = "0.10"
 log = "0.4"
+pnet = "0.35.0"
