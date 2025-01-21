@@ -19,17 +19,17 @@ pub enum Feature {
     /// 3. `ARCOMMANDS_Generic_DroneSettings_t` in `libARCommands/libARCommands/ARCOMMANDS_Types.h`
     /// 4. `ARCOMMANDS_Generic_DroneSettingsChanged_t` in `libARCommands/libARCommands/ARCOMMANDS_Types.h`
     Generic,
-    FollowMe,                         // ARCOMMANDS_ID_FEATURE_FOLLOW_ME = 134,
-    Wifi,                             // ARCOMMANDS_ID_FEATURE_WIFI = 135,
-    RC,                               // ARCOMMANDS_ID_FEATURE_RC = 136,
-    DroneManager,                     // ARCOMMANDS_ID_FEATURE_DRONE_MANAGER = 137,
-    Mapper,                           // ARCOMMANDS_ID_FEATURE_MAPPER = 138,
-    Debug,                            // ARCOMMANDS_ID_FEATURE_DEBUG = 139,
-    ControllerInfo,                   // ARCOMMANDS_ID_FEATURE_CONTROLLER_INFO = 140,
-    MapperMini,                       // ARCOMMANDS_ID_FEATURE_MAPPER_MINI = 141,
-    ThermalCam,                       // ARCOMMANDS_ID_FEATURE_THERMAL_CAM = 142,
-    Animation,                        // ARCOMMANDS_ID_FEATURE_ANIMATION = 144,
-    SequoiaCam,                       // ARCOMMANDS_ID_FEATURE_SEQUOIA_CAM = 147,
+    FollowMe,       // ARCOMMANDS_ID_FEATURE_FOLLOW_ME = 134,
+    Wifi,           // ARCOMMANDS_ID_FEATURE_WIFI = 135,
+    RC,             // ARCOMMANDS_ID_FEATURE_RC = 136,
+    DroneManager,   // ARCOMMANDS_ID_FEATURE_DRONE_MANAGER = 137,
+    Mapper,         // ARCOMMANDS_ID_FEATURE_MAPPER = 138,
+    Debug,          // ARCOMMANDS_ID_FEATURE_DEBUG = 139,
+    ControllerInfo, // ARCOMMANDS_ID_FEATURE_CONTROLLER_INFO = 140,
+    MapperMini,     // ARCOMMANDS_ID_FEATURE_MAPPER_MINI = 141,
+    ThermalCam,     // ARCOMMANDS_ID_FEATURE_THERMAL_CAM = 142,
+    Animation,      // ARCOMMANDS_ID_FEATURE_ANIMATION = 144,
+    SequoiaCam,     // ARCOMMANDS_ID_FEATURE_SEQUOIA_CAM = 147,
     /// Unknown 149 from anafi4k
     /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 14, feature: Some(Unknown { feature: 149, data: [0, 3, 0, 91, 33] }) }
     /// Unknown 148 from anafi4k

@@ -3,5 +3,5 @@ members = [
     "arsdk-rs",
     "jumpingsumo-rs",
     "bebop2",
-    # "anafi-rs",
+    "anafi-rs",
 ]

@@ -359,19 +359,26 @@ pub mod impl_scroll {
         fn try_into_ctx(self, this: &mut [u8], ctx: Endian) -> Result<usize, Self::Error> {
             let mut offset = 0;
 
-            this.gwrite_with::<u8>(self.frame_type.into(), &mut offset, ctx)?;
-            this.gwrite_with::<u8>(self.buffer_id.into(), &mut offset, ctx)?;
-            this.gwrite_with::<u8>(self.sequence_id, &mut offset, ctx)?;
+            // A frame contains the following information:
 
-            let buf_length_offset = offset;
+            // Data type (1 byte)
+            this.gwrite_with::<u8>(self.frame_type.into(), &mut offset, ctx)?;
+            // Target buffer ID (1 byte)
+            this.gwrite_with::<u8>(self.buffer_id.into(), &mut offset, ctx)?;
+            // Sequence number (1 byte)
+            this.gwrite_with::<u8>(self.sequence_id, &mut offset, ctx)?;
+            // Total size of the frame (4 bytes, Little endian)
             // reserve bytes for the buffer length (u32)
+            let buf_length_offset = offset;
+
             this.gwrite_with::<u32>(0, &mut offset, ctx)?;
 
+            // Actual data
             if let Some(feature) = self.feature {
                 this.gwrite_with::<Feature>(feature, &mut offset, ctx)?;
             };
 
-            // 7 bytes + feature_length bytes = buf.length
+            // we can now write the actual length
             this.pwrite_with::<u32>(offset as u32, buf_length_offset, ctx)?;
 
             Ok(offset)

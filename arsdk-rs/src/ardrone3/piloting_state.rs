@@ -43,7 +43,7 @@ pub enum PilotingState {
     SpeedChanged,
     /// ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ATTITUDECHANGED = 6,
     /// Frame { frame_type: Data, buffer_id: DCNavdata, sequence_id: 40, feature: Some(ArDrone3(Some(PilotingState { data: [6, 0, 44, 49, 49, 55, 153, 38, 7, 185, 107, 25, 201, 63] }))) }
-    AttitudeChanged,
+    AttitudeChanged(AttitudeChanged),
     /// ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_AUTOTAKEOFFMODECHANGED = 7,
     AutoTakeOffModeChanged,
     /// ARCOMMANDS_ID_ARDRONE3_PILOTINGSTATE_CMD_ALTITUDECHANGED = 8,
@@ -91,7 +91,7 @@ impl Into<u16> for &PilotingState {
             NavigateHomeStateChanged => 3,
             PositionChanged => 4,
             SpeedChanged => 5,
-            AttitudeChanged => 6,
+            AttitudeChanged(_) => 6,
             AutoTakeOffModeChanged => 7,
             AltitudeChanged => 8,
             GpsLocationChanged => 9,
@@ -106,6 +106,11 @@ impl Into<u16> for &PilotingState {
     }
 }
 
+// ------------------------------------------------------------
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct AttitudeChanged(Vec<u8>);
+
 pub mod scroll_impl {
     use super::*;
     use crate::{frame::Error, parse::read_unknown};
@@ -118,8 +123,8 @@ pub mod scroll_impl {
         fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
             let mut offset = 0;
 
-            #[allow(clippy::match_single_binding)]
             let piloting_state = match src.gread_with::<u16>(&mut offset, ctx)? {
+                6 => Self::AttitudeChanged(AttitudeChanged::try_from_ctx(&src[offset..], ctx)?.0),
                 unknown => Self::Unknown {
                     piloting_state: unknown,
                     data: read_unknown(src, &mut offset)?,
@@ -146,6 +151,23 @@ pub mod scroll_impl {
             }
 
             Ok(offset)
+        }
+    }
+
+    impl<'a> ctx::TryFromCtx<'a, Endian> for AttitudeChanged {
+        type Error = Error;
+
+        // and the lifetime annotation on `&'a [u8]` here
+        fn try_from_ctx(src: &'a [u8], ctx: Endian) -> Result<(Self, usize), Self::Error> {
+            let mut offset = 0;
+
+            let mut buffer = Vec::new();
+
+            while let Ok(b) = src.gread_with::<u8>(&mut offset, ctx) {
+                buffer.push(b);
+            }
+
+            Ok((Self(buffer), offset))
         }
     }
 }
